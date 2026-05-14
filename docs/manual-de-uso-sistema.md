@@ -1,4 +1,4 @@
-# Manual de uso — LUXE DETAIL (Centro de control)
+# Manual de uso — Kenzo Studio (Centro de control)
 
 **Audiencia:** personal del taller — recepción, operadores, detallistas y gerencia.  
 **Alcance:** operación diaria del panel: acceso, **roles y qué datos ve cada uno**, **módulo por módulo** (panel, órdenes, clientes, inventario, calendario, notificaciones, catálogo, lealtad, usuarios, auditoría) y **proceso por proceso** (ciclo completo de una orden desde la matrícula hasta facturación). Para instalación, Supabase y arranque del servidor, consulta [guia-ejecucion-usuario.md](./guia-ejecucion-usuario.md).

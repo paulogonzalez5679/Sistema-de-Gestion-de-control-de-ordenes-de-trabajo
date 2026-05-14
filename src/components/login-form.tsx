@@ -54,8 +54,8 @@ export function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="card" style={{ maxWidth: 420, margin: "0 auto" }}>
-      <h1 style={{ marginTop: 0 }}>LuxeDetail AI</h1>
-      <p style={{ color: "#b9accf" }}>Acceso de operador</p>
+      <h1 style={{ marginTop: 0 }}>Kenzo Studio</h1>
+      <p style={{ color: "#b9accf" }}>Bienvenido a Kenzo Studio</p>
       <label>
         Correo del operador
         <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />

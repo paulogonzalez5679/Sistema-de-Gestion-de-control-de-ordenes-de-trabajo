@@ -3,7 +3,7 @@ import { AppProviders } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AutoDetail SaaS Pro — Plataforma de taller",
+  title: "Kenzo Studio — Plataforma de taller",
   description: "Plataforma operativa para talleres de detallado premium."
 };
 

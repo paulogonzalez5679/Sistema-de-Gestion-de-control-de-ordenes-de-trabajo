@@ -146,8 +146,8 @@ export function DashboardShell({
         data-collapsed={showCollapsed ? "true" : "false"}
       >
         <div className="app-sidebar__brand">
-          <span className="app-sidebar__brand-mark">LUXE</span>
-          <span className="app-sidebar__brand-rest">DETAIL</span>
+          <span className="app-sidebar__brand-mark">Kenzo</span>
+          <span className="app-sidebar__brand-rest">Studio</span>
         </div>
         <p className={`app-sidebar__tagline ${showCollapsed ? "app-sidebar__tagline--hidden" : ""}`}>
           Centro de control
@@ -227,7 +227,7 @@ export function DashboardShell({
               className="app-topbar__brand-btn"
               onClick={() => router.push("/dashboard")}
             >
-              LUXE DETAIL
+              Kenzo Studio
             </button>
           </div>
           <div className="app-topbar__right">{headerSlot}</div>

@@ -1,0 +1,11 @@
+.next
+node_modules
+.env
+.env.local
+.env.*.local
+dist
+coverage
+*.log
+tsconfig.tsbuildinfo
+.cursor
+supabase

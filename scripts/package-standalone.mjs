@@ -1,13 +1,18 @@
 /**
  * Genera el paquete de distribución Windows (standalone) sin código fuente.
+ * IMPORTANTE: para uso en Windows, ejecute este script EN UN PC WINDOWS.
+ * Un paquete generado en macOS incluye binarios de Mac y fallará en Windows.
+ *
  * Uso: npm run package:win
  */
 import { spawnSync } from "node:child_process";
+import { platform, arch } from "node:os";
 import {
   copyFileSync,
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   unlinkSync,
@@ -15,6 +20,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { iniciarServidorBat, verificarInstalacionBat } from "./release-bat-templates.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -23,6 +29,9 @@ const staticDir = join(root, ".next", "static");
 const publicDir = join(root, "public");
 const releaseName = "autodetail-saas-pro-win";
 const outDir = join(root, "release", releaseName);
+
+const buildOs = platform();
+const isWindowsBuild = buildOs === "win32";
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -44,7 +53,27 @@ function ensureExists(path, label) {
   }
 }
 
+function findWrongPlatformNativeModules(dir) {
+  const bad = [];
+  if (!existsSync(dir)) return bad;
+  for (const name of readdirSync(dir)) {
+    if (/darwin|linux-(?!win)/i.test(name) && /sharp|swc|esbuild/i.test(name)) {
+      bad.push(name);
+    }
+  }
+  return bad;
+}
+
 console.log("\n=== AutoDetail SaaS Pro — empaquetado Windows ===\n");
+
+if (!isWindowsBuild) {
+  console.log("  ⚠  ATENCIÓN: está empaquetando desde", `${buildOs} (${arch()})`);
+  console.log("  El ZIP resultante NO funcionará en Windows si incluye módulos nativos de Mac.\n");
+  console.log("  Opciones:");
+  console.log("    1) Ejecute npm run package:win en un PC con Windows");
+  console.log("    2) Use GitHub Actions: workflow build-windows-release.yml\n");
+}
+
 console.log("1/3  Compilando aplicación (npm run build)...\n");
 run("npm", ["run", "build"]);
 
@@ -75,88 +104,63 @@ if (existsSync(shippedEnv)) {
   console.log("  (omitido .env del paquete — el taller debe crear el suyo desde .env.example)\n");
 }
 
-const batContent = `@echo off
-chcp 65001 >nul
-cd /d "%~dp0"
-title AutoDetail SaaS Pro
+const imgDir = join(outDir, "node_modules", "@img");
+const nativeBad = findWrongPlatformNativeModules(imgDir);
+const incompatible = !isWindowsBuild || nativeBad.length > 0;
 
-echo.
-echo  AutoDetail SaaS Pro
-echo  ===================
-echo.
+const buildInfo = [
+  `version=${JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version}`,
+  `build_os=${buildOs}`,
+  `build_arch=${arch()}`,
+  `target_os=win32`,
+  `INCOMPATIBLE_CON_WINDOWS=${incompatible ? "si" : "no"}`,
+  incompatible
+    ? "mensaje=Este paquete se genero fuera de Windows o contiene binarios de otra plataforma. No lo use en PCs Windows; regenere con npm run package:win en Windows."
+    : "mensaje=Paquete apto para Windows.",
+  nativeBad.length ? `modulos_sospechosos=${nativeBad.join(",")}` : ""
+]
+  .filter(Boolean)
+  .join("\n");
 
-where node >nul 2>&1
-if errorlevel 1 (
-  echo  ERROR: Node.js no esta instalado o no esta en el PATH.
-  echo  Instale Node.js LTS 20.x o 22.x desde https://nodejs.org
-  echo.
-  pause
-  exit /b 1
-)
-
-if not exist ".env" (
-  echo  ERROR: Falta el archivo .env en esta carpeta.
-  echo.
-  echo  1. Copie .env.example y renombre la copia a .env
-  echo  2. Edite .env con las claves de Supabase
-  echo  3. Vuelva a ejecutar este archivo
-  echo.
-  pause
-  exit /b 1
-)
-
-set HOSTNAME=0.0.0.0
-set PORT=3000
-
-echo  Iniciando servidor...
-echo.
-
-node launch-server.mjs
-
-echo.
-echo  Servidor detenido.
-pause
-`;
-
-writeFileSync(join(outDir, "Iniciar-Servidor.bat"), batContent, "utf8");
+writeFileSync(join(outDir, "BUILD-INFO.txt"), `${buildInfo}\n`, "utf8");
+writeFileSync(join(outDir, "Iniciar-Servidor.bat"), iniciarServidorBat, "utf8");
+writeFileSync(join(outDir, "Verificar-Instalacion.bat"), verificarInstalacionBat, "utf8");
 
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 const readme = `# AutoDetail SaaS Pro — paquete Windows (v${version})
 
-Este paquete **no incluye código fuente**. Solo contiene el servidor compilado.
+IMPORTANTE: el paquete debe generarse EN UN PC WINDOWS (npm run package:win).
+Si BUILD-INFO.txt dice INCOMPATIBLE_CON_WINDOWS=si, no funcionara en Windows.
 
 ## Requisitos en el PC del taller
 
-1. **Node.js LTS** 20.x o 22.x — https://nodejs.org (marque "Add to PATH" al instalar).
-2. Archivo **.env** con las variables de Supabase (ver \`.env.example\`).
-3. Conexión a **internet** hacia Supabase.
-4. (Opcional) Permitir Node en el **Firewall de Windows** para el puerto 3000.
+1. Node.js LTS 20.x o 22.x — https://nodejs.org ("Add to PATH")
+2. Archivo .env (copiar desde .env.example)
+3. Internet hacia Supabase
 
-## Instalación rápida
+## Pasos
 
-1. Copie toda esta carpeta al PC (USB, red, etc.).
-2. Renombre o copie \`.env.example\` → \`.env\` y complete los valores de Supabase.
-3. Doble clic en **Iniciar-Servidor.bat**.
-4. En la consola verá:
-   - \`http://localhost:3000\` — solo en este PC
-   - \`http://192.168.x.x:3000\` — tablets y otros PCs en la misma Wi‑Fi
-5. Abra esa URL en el navegador e inicie sesión.
+1. Copie toda esta carpeta al PC Windows.
+2. .env.example -> .env (rellenar Supabase)
+3. Doble clic: Verificar-Instalacion.bat (recomendado la primera vez)
+4. Doble clic: Iniciar-Servidor.bat
+5. Abra http://localhost:3000 o la IP Network que muestre la consola.
 
-## Importante
-
-- Use **siempre la misma URL** en el equipo (localhost o IP de red), no mezcle ambas.
-- No comparta el archivo \`.env\` (contiene claves secretas).
-- Para detener el servidor, cierre la ventana negra o pulse Ctrl+C.
-
-Guía completa: en el repositorio de desarrollo, \`docs/instalacion-windows-standalone.md\`.
+Guia: docs/instalacion-windows-standalone.md (en el repo del desarrollador).
 `;
 
 writeFileSync(join(outDir, "LEEME.txt"), readme, "utf8");
 
 console.log("\n3/3  Paquete listo.\n");
 console.log(`  Carpeta: ${outDir}`);
-console.log("\n  Contenido para el taller:");
+console.log(`  BUILD-INFO: INCOMPATIBLE_CON_WINDOWS=${incompatible ? "si" : "no"}`);
+if (incompatible) {
+  console.log("\n  ⚠  No distribuya este ZIP a Windows. Genere el paquete en Windows.\n");
+} else {
+  console.log("\n  Listo para copiar a PCs Windows.\n");
+}
+console.log("  Archivos:");
 console.log("    - Iniciar-Servidor.bat");
-console.log("    - .env.example  (copiar a .env y rellenar)");
-console.log("    - LEEME.txt");
-console.log("\n  Comprima la carpeta en ZIP para distribuir si lo desea.\n");
+console.log("    - Verificar-Instalacion.bat");
+console.log("    - BUILD-INFO.txt");
+console.log("    - .env.example\n");

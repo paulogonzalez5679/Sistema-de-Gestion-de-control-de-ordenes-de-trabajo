@@ -1,0 +1,37 @@
+# Genera el paquete Windows (standalone) en la nube — binarios correctos para win32.
+# Descargue el artefacto "autodetail-saas-pro-win" desde la pestaña Actions del repo.
+name: Build Windows release package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  package-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and package
+        run: npm run package:win
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder
+          SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: autodetail-saas-pro-win
+          path: release/autodetail-saas-pro-win/
+          retention-days: 30

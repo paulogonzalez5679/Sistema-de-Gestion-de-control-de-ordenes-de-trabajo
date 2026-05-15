@@ -11,15 +11,26 @@ Esta guía cubre **dos roles**:
 
 ## Parte A — Generar el paquete (en tu PC de desarrollo)
 
+### A.0 Muy importante: compilar en Windows
+
+Un paquete generado en **macOS o Linux no funciona en Windows** (incluye librerías nativas de la plataforma incorrecta, p. ej. `sharp-darwin-arm64`).
+
+| Dónde generar | ¿Sirve en Windows? |
+|---------------|-------------------|
+| Mac / Linux (`npm run package:win`) | **No** — `BUILD-INFO.txt` marcará `INCOMPATIBLE_CON_WINDOWS=si` |
+| **PC con Windows** | **Sí** |
+| **GitHub Actions** (workflow `build-windows-release.yml`) | **Sí** — descargue el artefacto ZIP |
+
 ### A.1 Requisitos
 
 - Node.js LTS **20.x o 22.x** y npm
 - Código del proyecto con dependencias instaladas (`npm install`)
 - Archivo `.env` válido en la raíz (solo para **compilar**; no se incluye en el paquete)
+- Para el ZIP final: máquina **Windows** o GitHub Actions
 
-### A.2 Compilar y empaquetar
+### A.2 Compilar y empaquetar (en Windows)
 
-En la raíz del proyecto (donde está `package.json`):
+En la raíz del proyecto (donde está `package.json`), en un **PC Windows**:
 
 ```bash
 npm install
@@ -29,9 +40,17 @@ npm run package:win
 El script:
 
 1. Ejecuta `npm run build` (modo producción con `output: "standalone"`).
-2. Arma la carpeta `release/autodetail-saas-pro-win/` con el servidor compilado, estáticos, `Iniciar-Servidor.bat`, `.env.example` y `LEEME.txt`.
+2. Arma la carpeta `release/autodetail-saas-pro-win/` con el servidor compilado, estáticos, `Iniciar-Servidor.bat`, `Verificar-Instalacion.bat`, `BUILD-INFO.txt`, `.env.example` y `LEEME.txt`.
 
 **No** copia `src/`, TypeScript ni el repositorio Git.
+
+### A.2b Alternativa: GitHub Actions (si solo tienes Mac)
+
+1. Sube el repo a GitHub.
+2. **Actions** → **Build Windows release package** → **Run workflow**.
+3. Al terminar, descarga el artefacto **autodetail-saas-pro-win** (ZIP listo para el taller).
+
+El workflow usa variables placeholder solo para compilar; el taller pondrá su `.env` real.
 
 ### A.3 Entregar al taller
 
@@ -85,7 +104,8 @@ Sustituya la carpeta en el PC del taller (o desinstale la anterior y copie la nu
 
 ### B.4 Arrancar el servidor
 
-1. Doble clic en **`Iniciar-Servidor.bat`**.
+1. (Recomendado la primera vez) Doble clic en **`Verificar-Instalacion.bat`** — comprueba Node, `.env` y si el paquete es compatible con Windows (`BUILD-INFO.txt`).
+2. Doble clic en **`Iniciar-Servidor.bat`**.
 2. Si falta Node.js o `.env`, la ventana mostrará un mensaje de error y pausará.
 3. Si todo está bien, verá algo como:
 
@@ -123,6 +143,7 @@ La app solo es accesible en la red mientras esa ventana siga abierta.
 
 | Síntoma | Solución |
 |---------|----------|
+| Mensaje **INCOMPATIBLE_CON_WINDOWS** o paquete hecho en Mac | Regenerar el ZIP **en Windows** o con GitHub Actions; no copiar `release/` desde Mac |
 | `Node.js no esta instalado` | Instale Node LTS desde nodejs.org y reinicie el PC |
 | `Falta el archivo .env` | Copie `.env.example` → `.env` y rellene valores |
 | Error de variables al arrancar | Revise URL y claves en `.env`; reinicie el BAT |

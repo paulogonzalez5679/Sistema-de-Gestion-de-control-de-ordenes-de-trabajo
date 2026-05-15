@@ -33,6 +33,8 @@ const nextConfig = {
     "@supabase/phoenix"
   ],
   images: {
+    // Evita sharp nativo por plataforma (Mac vs Windows) en el paquete standalone.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",

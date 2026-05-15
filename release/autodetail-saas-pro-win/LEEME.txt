@@ -1,0 +1,20 @@
+# AutoDetail SaaS Pro — paquete Windows (v1.0.0)
+
+IMPORTANTE: el paquete debe generarse EN UN PC WINDOWS (npm run package:win).
+Si BUILD-INFO.txt dice INCOMPATIBLE_CON_WINDOWS=si, no funcionara en Windows.
+
+## Requisitos en el PC del taller
+
+1. Node.js LTS 20.x o 22.x — https://nodejs.org ("Add to PATH")
+2. Archivo .env (copiar desde .env.example)
+3. Internet hacia Supabase
+
+## Pasos
+
+1. Copie toda esta carpeta al PC Windows.
+2. .env.example -> .env (rellenar Supabase)
+3. Doble clic: Verificar-Instalacion.bat (recomendado la primera vez)
+4. Doble clic: Iniciar-Servidor.bat
+5. Abra http://localhost:3000 o la IP Network que muestre la consola.
+
+Guia: docs/instalacion-windows-standalone.md (en el repo del desarrollador).

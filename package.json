@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "start:lan": "next start --hostname 0.0.0.0",
+    "package:win": "node scripts/package-standalone.mjs",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },

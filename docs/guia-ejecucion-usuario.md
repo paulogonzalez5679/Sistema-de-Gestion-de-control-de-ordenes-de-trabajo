@@ -179,5 +179,6 @@ La pantalla de entrada es la de **login** (`/login`). Usa el usuario creado en S
 | [outbox-workers.md](./outbox-workers.md) | Worker asíncrono, LAN, `curl`, token `OUTBOX_WORKER_TOKEN`. |
 | [rls-migration-plan.md](./rls-migration-plan.md) | Evolución de seguridad en base de datos (RLS y cliente con sesión). |
 | [`.env.example`](../.env.example) | Lista mínima de variables con comentarios. |
+| [instalacion-windows-standalone.md](./instalacion-windows-standalone.md) | **Distribución Windows:** build standalone, ZIP sin fuente, `Iniciar-Servidor.bat` y LAN. |
 
 Si necesitas soporte técnico del proveedor del código, adjunta versión de Node (`node -v`), mensaje de error exacto y confirmación de que `schema.sql` + migraciones se aplicaron sin error en el SQL Editor.

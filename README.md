@@ -4,6 +4,8 @@ Production-oriented Next.js + Supabase implementation generated from Stitch scre
 
 **Guía para instalar, requisitos y comandos (usuario / TI):** [docs/guia-ejecucion-usuario.md](docs/guia-ejecucion-usuario.md)
 
+**Paquete Windows sin código fuente (standalone):** [docs/instalacion-windows-standalone.md](docs/instalacion-windows-standalone.md) — generar con `npm run package:win`.
+
 ## Stack
 - Next.js App Router
 - TypeScript

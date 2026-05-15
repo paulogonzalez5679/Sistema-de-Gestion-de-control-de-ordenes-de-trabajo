@@ -1,7 +1,6 @@
 version=1.0.0
-build_os=darwin
-build_arch=arm64
+build_os=win32
+build_arch=x64
 target_os=win32
-INCOMPATIBLE_CON_WINDOWS=si
-mensaje=Este paquete se genero fuera de Windows o contiene binarios de otra plataforma. No lo use en PCs Windows; regenere con npm run package:win en Windows.
-modulos_sospechosos=sharp-darwin-arm64,sharp-libvips-darwin-arm64
+INCOMPATIBLE_CON_WINDOWS=no
+mensaje=Paquete apto para Windows.

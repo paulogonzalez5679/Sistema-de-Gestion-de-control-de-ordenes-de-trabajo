@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useRouter, useSearchParams } from "next/navigation";
 import type { InventoryItem, WorkOrderPriority } from "@/lib/types";
 import { formatPriority, formatProfileRole } from "@/lib/ui-labels";
+import { randomUuid } from "@/lib/ids";
 import { ResponsiveSelect } from "@/components/responsive-select";
 import {
   INTAKE_MIN_PHOTOS,
@@ -334,7 +335,7 @@ export function OrderServicesForm({
       }
 
       // Reintento seguro: una sola escritura atómica protegida por Idempotency-Key.
-      const idempotencyKey = globalThis.crypto.randomUUID();
+      const idempotencyKey = randomUuid();
       const bundleRes = await fetch("/api/orders/bundle", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },

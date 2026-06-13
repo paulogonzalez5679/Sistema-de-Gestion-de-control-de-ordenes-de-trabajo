@@ -7,7 +7,6 @@ import {
   intakePhotoPublicUrl,
   saveOrderIntake
 } from "@/lib/local-storage/intake-photos";
-import { updateOrder } from "@/modules/orders/order.service";
 import { recordAuditEvent } from "@/modules/audit/audit.service";
 
 type Params = { params: Promise<{ id: string }> };
@@ -81,8 +80,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       const message = err instanceof Error ? err.message : "No se pudo guardar el ingreso.";
       return badRequest(message);
     }
-
-    await updateOrder(id, { intake_condition_notes: manifest.intakeConditionNotes });
 
     await recordAuditEvent({
       actorId: auth.profile.id,

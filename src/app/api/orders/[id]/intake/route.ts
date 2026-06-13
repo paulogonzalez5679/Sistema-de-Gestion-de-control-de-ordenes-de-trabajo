@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import { badRequest, internalError, notFound, ok } from "@/lib/api-response";
+import { badRequest, internalError, ok } from "@/lib/api-response";
 import { requirePermission } from "@/lib/permissions";
+import { gateOrderById } from "@/lib/order-access";
 import {
   getOrderIntake,
   intakePhotoPublicUrl,
   saveOrderIntake
 } from "@/lib/local-storage/intake-photos";
-import { getOrderById, updateOrder } from "@/modules/orders/order.service";
+import { updateOrder } from "@/modules/orders/order.service";
 import { recordAuditEvent } from "@/modules/audit/audit.service";
 
 type Params = { params: Promise<{ id: string }> };
@@ -31,8 +32,8 @@ export async function GET(_: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id } = await params;
-    const order = await getOrderById(id);
-    if (!order) return notFound("Order");
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
 
     const manifest = await getOrderIntake(id);
     if (!manifest) {
@@ -50,8 +51,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id } = await params;
-    const order = await getOrderById(id);
-    if (!order) return notFound("Order");
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
 
     const form = await request.formData();
     const notesRaw = form.get("intake_condition_notes");
@@ -81,11 +82,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       return badRequest(message);
     }
 
-    try {
-      await updateOrder(id, { intake_condition_notes: intakeConditionNotes });
-    } catch {
-      /* Columna opcional en BD; el manifest local es la fuente principal. */
-    }
+    await updateOrder(id, { intake_condition_notes: manifest.intakeConditionNotes });
 
     await recordAuditEvent({
       actorId: auth.profile.id,
@@ -93,9 +90,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       entityType: "work_order",
       entityId: id,
       workOrderId: id,
-      summary: `${auth.profile.full_name} registró el ingreso de ${order.order_number} (${manifest.photos.length} foto(s)).`,
+      summary: `${auth.profile.full_name} registró el ingreso de ${gate.order.order_number} (${manifest.photos.length} foto(s)).`,
       metadata: {
-        order_number: order.order_number,
+        order_number: gate.order.order_number,
         photo_count: manifest.photos.length
       }
     });

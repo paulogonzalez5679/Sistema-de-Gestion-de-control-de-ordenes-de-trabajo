@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { internalError, ok, unauthorized } from "@/lib/api-response";
 import { claimOutboxBatch, markOutboxFailed, markOutboxProcessed } from "@/modules/outbox/outbox.service";
@@ -26,14 +27,20 @@ export const dynamic = "force-dynamic";
 
 const MAX_BATCH_SIZE = 50;
 
+function tokensMatch(expected: string, got: string): boolean {
+  const a = Buffer.from(expected);
+  const b = Buffer.from(got);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
 function authorize(request: NextRequest): boolean {
   const expected = process.env.OUTBOX_WORKER_TOKEN;
   if (!expected) {
-    // Sin token configurado el worker queda deshabilitado por seguridad.
     return false;
   }
   const got = request.headers.get("x-job-token") ?? "";
-  return got === expected;
+  return tokensMatch(expected, got);
 }
 
 export async function POST(request: NextRequest) {
@@ -59,7 +66,6 @@ export async function POST(request: NextRequest) {
         results.push({ id: event.id, topic: event.topic, status: "processed" });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
-        // Backoff lineal sencillo: 60s * intento, hasta 30 min.
         const retryIn = Math.min(30 * 60, 60 * Math.max(1, event.attempt_count));
         await markOutboxFailed(event.id, msg, retryIn);
         results.push({ id: event.id, topic: event.topic, status: "failed", error: msg });

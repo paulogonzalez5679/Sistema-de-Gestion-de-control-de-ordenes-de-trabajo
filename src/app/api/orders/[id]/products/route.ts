@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { badRequest, internalError, ok } from "@/lib/api-response";
 import { requirePermission } from "@/lib/permissions";
+import { gateOrderById } from "@/lib/order-access";
 import { addOrderProductSchema } from "@/lib/schemas/order-line";
 import { parseJsonBody } from "@/lib/schemas/zod-utils";
 import {
@@ -16,6 +17,8 @@ export async function GET(_: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id } = await params;
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
     const lines = await getOrderProductsEnriched(id);
     return ok(lines);
   } catch (error) {
@@ -29,6 +32,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id: workOrderId } = await params;
+    const gate = await gateOrderById(auth.profile, workOrderId);
+    if (!gate.ok) return gate.response;
+
     const parsed = await parseJsonBody(request, addOrderProductSchema);
     if ("response" in parsed) return parsed.response;
 

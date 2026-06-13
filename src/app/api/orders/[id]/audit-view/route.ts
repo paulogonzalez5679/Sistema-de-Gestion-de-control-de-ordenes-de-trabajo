@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { internalError, notFound, ok } from "@/lib/api-response";
+import { internalError, ok } from "@/lib/api-response";
 import { requirePermission } from "@/lib/permissions";
-import { getOrderById } from "@/modules/orders/order.service";
+import { gateOrderById } from "@/lib/order-access";
 import { recordAuditEvent } from "@/modules/audit/audit.service";
 
 type Params = { params: Promise<{ id: string }> };
@@ -14,8 +14,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     const profile = auth.profile;
 
     const { id } = await params;
-    const order = await getOrderById(id);
-    if (!order) return notFound("Order");
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
+    const order = gate.order;
 
     let body: { context?: string } = {};
     try {

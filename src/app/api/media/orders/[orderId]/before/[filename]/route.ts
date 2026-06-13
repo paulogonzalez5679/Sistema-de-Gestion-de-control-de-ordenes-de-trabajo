@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { internalError, notFound } from "@/lib/api-response";
 import { requirePermission } from "@/lib/permissions";
+import { gateOrderById } from "@/lib/order-access";
 import { readIntakePhotoFile } from "@/lib/local-storage/intake-photos";
-import { getOrderById } from "@/modules/orders/order.service";
 
 type Params = { params: Promise<{ orderId: string; filename: string }> };
 
@@ -12,8 +12,8 @@ export async function GET(_: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { orderId, filename } = await params;
-    const order = await getOrderById(orderId);
-    if (!order) return notFound("Order");
+    const gate = await gateOrderById(auth.profile, orderId);
+    if (!gate.ok) return gate.response;
 
     const file = await readIntakePhotoFile(orderId, decodeURIComponent(filename));
     if (!file) return notFound("Image");

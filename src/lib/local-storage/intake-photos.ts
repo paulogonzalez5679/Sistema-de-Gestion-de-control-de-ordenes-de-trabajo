@@ -1,6 +1,8 @@
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { detectImageExt, isAllowedImageMime, ORDER_IMAGE_MAX_BYTES } from "@/lib/image-bytes";
+import { isUuid } from "@/lib/ids";
 import {
   orderIntakeDir,
   orderIntakeManifestPath,
@@ -10,7 +12,7 @@ import { getEffectiveMediaRoot } from "@/lib/local-storage/settings";
 
 export const INTAKE_MIN_PHOTOS = 1;
 export const INTAKE_MAX_PHOTOS = 5;
-export const INTAKE_MAX_BYTES = 3 * 1024 * 1024;
+export const INTAKE_MAX_BYTES = ORDER_IMAGE_MAX_BYTES;
 
 export type IntakePhotoMeta = {
   filename: string;
@@ -26,38 +28,10 @@ export type OrderIntakeManifest = {
   updatedAt: string;
 };
 
-const ALLOWED_MIME: Record<string, string> = {
-  "image/jpeg": ".jpg",
-  "image/webp": ".webp",
-  "image/png": ".png"
-};
-
-function detectImageExt(buffer: Buffer): { ext: string; mimeType: string } | null {
-  if (buffer.length < 12) return null;
-  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-    return { ext: ".jpg", mimeType: "image/jpeg" };
+function assertValidOrderId(orderId: string): void {
+  if (!isUuid(orderId)) {
+    throw new Error("Identificador de orden inválido.");
   }
-  if (
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47
-  ) {
-    return { ext: ".png", mimeType: "image/png" };
-  }
-  if (
-    buffer[0] === 0x52 &&
-    buffer[1] === 0x49 &&
-    buffer[2] === 0x46 &&
-    buffer[3] === 0x46 &&
-    buffer[8] === 0x57 &&
-    buffer[9] === 0x45 &&
-    buffer[10] === 0x42 &&
-    buffer[11] === 0x50
-  ) {
-    return { ext: ".webp", mimeType: "image/webp" };
-  }
-  return null;
 }
 
 function safeFilename(name: string): boolean {
@@ -73,6 +47,7 @@ export async function saveOrderIntake(params: {
   intakeConditionNotes: string;
   files: { buffer: Buffer; declaredMime?: string }[];
 }): Promise<OrderIntakeManifest> {
+  assertValidOrderId(params.orderId);
   const notes = params.intakeConditionNotes.trim();
   if (notes.length < 3) {
     throw new Error("Los detalles de ingreso son obligatorios (mínimo 3 caracteres).");
@@ -99,7 +74,7 @@ export async function saveOrderIntake(params: {
     if (!detected) {
       throw new Error("Solo se permiten imágenes JPEG, PNG o WebP.");
     }
-    if (file.declaredMime && !ALLOWED_MIME[file.declaredMime]) {
+    if (file.declaredMime && !isAllowedImageMime(file.declaredMime)) {
       throw new Error("Tipo de imagen no permitido.");
     }
     const filename = `${String(index).padStart(2, "0")}${detected.ext}`;
@@ -131,6 +106,7 @@ export async function saveOrderIntake(params: {
 }
 
 export async function getOrderIntake(orderId: string): Promise<OrderIntakeManifest | null> {
+  if (!isUuid(orderId)) return null;
   const mediaRoot = await getEffectiveMediaRoot();
   const manifestPath = orderIntakeManifestPath(mediaRoot, orderId);
   if (!existsSync(manifestPath)) return null;
@@ -146,7 +122,7 @@ export async function readIntakePhotoFile(
   orderId: string,
   filename: string
 ): Promise<{ buffer: Buffer; mimeType: string } | null> {
-  if (!safeFilename(filename)) return null;
+  if (!isUuid(orderId) || !safeFilename(filename)) return null;
   const mediaRoot = await getEffectiveMediaRoot();
   const fullPath = path.join(orderIntakeDir(mediaRoot, orderId), filename);
   if (!existsSync(fullPath)) return null;
@@ -159,6 +135,7 @@ export async function readIntakePhotoFile(
 }
 
 export async function listIntakeFilenames(orderId: string): Promise<string[]> {
+  if (!isUuid(orderId)) return [];
   const mediaRoot = await getEffectiveMediaRoot();
   const dir = orderIntakeDir(mediaRoot, orderId);
   if (!existsSync(dir)) return [];

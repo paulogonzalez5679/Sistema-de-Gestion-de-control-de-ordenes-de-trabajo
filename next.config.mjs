@@ -1,7 +1,18 @@
 /** @type {import('next').NextConfig} */
+function supabaseConnectOrigins() {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
+  try {
+    const origin = new URL(raw).origin;
+    return origin ? ` ${origin}` : "";
+  } catch {
+    return "";
+  }
+}
+
 const nextConfig = {
   output: "standalone",
   async headers() {
+    const supabaseOrigins = supabaseConnectOrigins();
     const securityHeaders = [
       { key: "X-DNS-Prefetch-Control", value: "on" },
       { key: "X-Frame-Options", value: "DENY" },
@@ -10,6 +21,20 @@ const nextConfig = {
       {
         key: "Permissions-Policy",
         value: "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+      },
+      {
+        key: "Content-Security-Policy",
+        value: [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: blob:",
+          `connect-src 'self'${supabaseOrigins}`,
+          "font-src 'self'",
+          "frame-ancestors 'none'",
+          "base-uri 'self'",
+          "form-action 'self'"
+        ].join("; ")
       }
     ];
     if (process.env.NODE_ENV === "production") {

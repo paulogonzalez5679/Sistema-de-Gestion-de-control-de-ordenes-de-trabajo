@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { badRequest, internalError, ok } from "@/lib/api-response";
 import { offsetForPage, parsePageParam } from "@/lib/pagination";
 import { requirePermission } from "@/lib/permissions";
+import { gateOrderById } from "@/lib/order-access";
 import { recordAuditEvent } from "@/modules/audit/audit.service";
-import { addOrderUpdate, getOrderById, getOrderUpdatesPage } from "@/modules/orders/order.service";
+import { addOrderUpdate, getOrderUpdatesPage } from "@/modules/orders/order.service";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -15,6 +16,9 @@ export async function GET(request: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id } = await params;
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
+
     const page = parsePageParam(request.nextUrl.searchParams.get("page") ?? undefined);
     const pageSize = Math.min(
       50,
@@ -34,6 +38,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id } = await params;
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
+
     const body = await request.json();
     if (!body?.message) return badRequest("message is required");
 
@@ -47,7 +54,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       message: body.message
     });
 
-    const order = await getOrderById(id);
+    const order = gate.order;
     const preview =
       String(body.message).length > 160 ? `${String(body.message).slice(0, 160)}…` : String(body.message);
 
@@ -61,7 +68,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         ? `${profile.full_name} añadió una nota en ${order.order_number}.`
         : `${profile.full_name} añadió una nota en la orden.`,
       metadata: {
-        order_number: order?.order_number,
+        order_number: order.order_number,
         message_preview: preview,
         update_id: created.id
       }

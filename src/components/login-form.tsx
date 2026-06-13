@@ -2,16 +2,6 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase";
-
-function translateAuthMessage(msg: string): string {
-  const m = msg.trim();
-  const lower = m.toLowerCase();
-  if (lower.includes("invalid login credentials")) return "Credenciales incorrectas. Revisa correo y contraseña.";
-  if (lower.includes("email not confirmed")) return "Confirma tu correo antes de iniciar sesión.";
-  if (lower.includes("too many requests")) return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
-  return m;
-}
 
 export function LoginForm() {
   const router = useRouter();
@@ -24,29 +14,33 @@ export function LoginForm() {
     event.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = createSupabaseBrowserClient();
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) {
-        const msg = signInError.message ?? "";
-        const networkHint =
-          /fetch|network|failed/i.test(msg) || signInError.name === "AuthRetryableFetchError"
-            ? " Comprueba que la URL del proyecto en Supabase coincida con NEXT_PUBLIC_SUPABASE_URL (debe ser https://<ref>.supabase.co con las mismas claves)."
-            : "";
-        setError(translateAuthMessage(msg) + networkHint);
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      let payload: { error?: string } = {};
+      try {
+        payload = (await response.json()) as { error?: string };
+      } catch {
+        payload = {};
+      }
+
+      if (!response.ok) {
+        setError(payload.error ?? "No se pudo iniciar sesión.");
         setLoading(false);
         return;
       }
+
       router.push("/dashboard");
       router.refresh();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      const isFetch =
-        message.includes("fetch") || message.includes("Failed to fetch") || message.includes("ENOTFOUND");
+    } catch {
       setError(
-        isFetch
-          ? "No se pudo conectar con Supabase. Verifica que NEXT_PUBLIC_SUPABASE_URL en .env coincida exactamente con la URL del proyecto y reinicia npm run dev."
-          : translateAuthMessage(message)
+        process.env.NODE_ENV === "development"
+          ? "No se pudo conectar con el servidor. Verifica que la app esté en ejecución."
+          : "No se pudo conectar con el servicio de autenticación. Inténtalo más tarde."
       );
       setLoading(false);
     }

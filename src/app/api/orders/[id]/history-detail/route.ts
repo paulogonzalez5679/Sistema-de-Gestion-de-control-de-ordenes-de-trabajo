@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { internalError, notFound, ok } from "@/lib/api-response";
 import { isUuid } from "@/lib/ids";
 import { requirePermission } from "@/lib/permissions";
+import { gateOrderById } from "@/lib/order-access";
 import { redactWorkOrderServicePricing } from "@/lib/service-pricing-access";
 import { getOrderHistoryDetail } from "@/modules/orders/order.service";
 
@@ -14,6 +15,8 @@ export async function GET(_: NextRequest, { params }: Params) {
 
     const { id } = await params;
     if (!isUuid(id)) return notFound("Order");
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
 
     const detail = await getOrderHistoryDetail(id);
     if (!detail) return notFound("Order");

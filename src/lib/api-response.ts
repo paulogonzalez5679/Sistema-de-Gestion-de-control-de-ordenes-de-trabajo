@@ -26,7 +26,10 @@ export function unauthorized(message = "Unauthorized") {
 }
 
 export function internalError(error: unknown) {
-  // Secure SQL / error-handling rules: never expose DB or stack details to API clients.
-  console.error("[api] internal error", error);
+  const message =
+    error instanceof Error
+      ? error.message.replace(/[\r\n\x00-\x1f\x7f]/g, " ").slice(0, 200)
+      : "unknown";
+  console.error("[api] internal error", message);
   return NextResponse.json({ error: "Error interno del servidor." }, { status: 500 });
 }

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { internalError, notFound, ok } from "@/lib/api-response";
 import { requirePermission } from "@/lib/permissions";
+import { gateOrderById } from "@/lib/order-access";
 import { removeOrderProduct } from "@/modules/orders/order.service";
 
 type Params = { params: Promise<{ id: string; lineId: string }> };
@@ -11,6 +12,9 @@ export async function DELETE(_: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id: workOrderId, lineId } = await params;
+    const gate = await gateOrderById(auth.profile, workOrderId);
+    if (!gate.ok) return gate.response;
+
     const removed = await removeOrderProduct({
       workOrderId,
       lineId,

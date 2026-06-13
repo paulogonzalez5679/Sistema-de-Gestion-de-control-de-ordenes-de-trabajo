@@ -334,7 +334,7 @@ export function OrderServicesForm({
       }
 
       // Reintento seguro: una sola escritura atómica protegida por Idempotency-Key.
-      const idempotencyKey = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`).toString();
+      const idempotencyKey = globalThis.crypto.randomUUID();
       const bundleRes = await fetch("/api/orders/bundle", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },

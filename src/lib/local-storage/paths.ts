@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
+import { isUuid } from "@/lib/ids";
 
 /** Carpeta de datos fuera del proyecto (hermana al cwd del servidor / paquete Windows). */
 export function getDefaultDataDir(): string {
@@ -42,10 +43,18 @@ export function resolveAdminMediaPath(raw: string): string {
   return resolved;
 }
 
+function assertOrderId(orderId: string): void {
+  if (!isUuid(orderId)) {
+    throw new Error("Identificador de orden inválido.");
+  }
+}
+
 export function orderIntakeDir(mediaRoot: string, orderId: string): string {
+  assertOrderId(orderId);
   return path.join(mediaRoot, "orders", orderId, "before");
 }
 
 export function orderIntakeManifestPath(mediaRoot: string, orderId: string): string {
+  assertOrderId(orderId);
   return path.join(mediaRoot, "orders", orderId, "intake.json");
 }

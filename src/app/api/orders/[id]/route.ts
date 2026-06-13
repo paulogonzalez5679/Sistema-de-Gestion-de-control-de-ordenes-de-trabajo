@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { ecuadorWallDateTimeToUtcIso } from "@/lib/app-timezone";
 import { badRequest, forbidden, internalError, notFound, ok } from "@/lib/api-response";
 import { hasPermission, requirePermission } from "@/lib/permissions";
+import { gateOrderById } from "@/lib/order-access";
 import { canPickOrderAssignee } from "@/lib/roles";
 import { formatOrderStatus } from "@/lib/ui-labels";
 import type { UpdateWorkOrderInput } from "@/modules/orders/order.service";
@@ -101,9 +102,9 @@ export async function GET(_: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id } = await params;
-    const order = await getOrderById(id);
-    if (!order) return notFound("Order");
-    return ok(order);
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
+    return ok(gate.order);
   } catch (error) {
     return internalError(error);
   }
@@ -115,14 +116,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id } = await params;
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
+    const before = gate.order;
+
     const rawBody = (await request.json()) as Record<string, unknown>;
     normalizeNaiveScheduleFields(rawBody);
     const body = pickWorkOrderApiPatch(rawBody);
-    const before = await getOrderById(id);
-    if (!before) return notFound("Order");
-
     const sessionProfile = auth.profile;
-    const role = sessionProfile?.role;
+    const role = sessionProfile.role;
 
     const detailPatchRequested = clientRequestedOrderDetailPatch(rawBody);
     const assigneeOnlyPatch =
@@ -292,8 +294,9 @@ export async function DELETE(_: NextRequest, { params }: Params) {
     const sessionProfile = auth.profile;
 
     const { id } = await params;
-    const before = await getOrderById(id);
-    if (!before) return notFound("Order");
+    const gate = await gateOrderById(auth.profile, id);
+    if (!gate.ok) return gate.response;
+    const before = gate.order;
 
     const removed = await deleteOrder(id);
     if (!removed) return notFound("Order");

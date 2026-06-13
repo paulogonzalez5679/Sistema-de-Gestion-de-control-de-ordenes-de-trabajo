@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isMutationCsrfAllowed } from "@/lib/api-mutation-guard";
 import { checkApiRateLimit, clientKeyFromRequest } from "@/lib/api-rate-limit-edge";
+import { checkLoginRateLimitByIp, LOGIN_RATE_LIMIT_MESSAGE } from "@/lib/login-rate-limit";
+
+const OUTBOX_JOB_PATH = "/api/jobs/process-outbox";
+const AUTH_LOGIN_PATH = "/api/auth/login";
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({
@@ -36,11 +41,30 @@ export async function middleware(request: NextRequest) {
       );
     }
 
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+    if (!isMutationCsrfAllowed(request)) {
+      return NextResponse.json({ error: "Solicitud rechazada." }, { status: 403 });
+    }
+
+    const isOutboxWorker = pathname === OUTBOX_JOB_PATH || pathname.startsWith(`${OUTBOX_JOB_PATH}/`);
+    const isAuthLogin = pathname === AUTH_LOGIN_PATH;
+
+    if (isAuthLogin && request.method === "POST") {
+      const loginRl = checkLoginRateLimitByIp(clientKeyFromRequest(request));
+      if (!loginRl.ok) {
+        return NextResponse.json(
+          { error: LOGIN_RATE_LIMIT_MESSAGE },
+          { status: 429, headers: { "Retry-After": String(loginRl.retryAfterSec) } }
+        );
+      }
+    }
+
+    if (!isOutboxWorker && !isAuthLogin) {
+      const {
+        data: { user }
+      } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+      }
     }
     return response;
   }

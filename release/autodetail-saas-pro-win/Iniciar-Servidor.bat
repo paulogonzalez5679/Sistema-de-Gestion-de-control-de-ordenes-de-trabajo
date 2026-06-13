@@ -16,7 +16,7 @@ if exist "BUILD-INFO.txt" (
     type BUILD-INFO.txt
     echo.
     echo  Solucion: genere el paquete en un PC Windows con "npm run package:win"
-    echo  o descargue el ZIP generado por GitHub Actions (build Windows).
+    echo  o descargue el ZIP generado por GitHub Actions ^(build Windows^).
     echo.
     pause
     exit /b 1

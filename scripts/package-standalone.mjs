@@ -22,6 +22,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { iniciarServidorBat, verificarInstalacionBat } from "./release-bat-templates.mjs";
 
+function toWindowsEol(text) {
+  return text.replace(/\r?\n/g, "\r\n");
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const standaloneDir = join(root, ".next", "standalone");
@@ -123,8 +127,8 @@ const buildInfo = [
   .join("\n");
 
 writeFileSync(join(outDir, "BUILD-INFO.txt"), `${buildInfo}\n`, "utf8");
-writeFileSync(join(outDir, "Iniciar-Servidor.bat"), iniciarServidorBat, "utf8");
-writeFileSync(join(outDir, "Verificar-Instalacion.bat"), verificarInstalacionBat, "utf8");
+writeFileSync(join(outDir, "Iniciar-Servidor.bat"), toWindowsEol(iniciarServidorBat), "utf8");
+writeFileSync(join(outDir, "Verificar-Instalacion.bat"), toWindowsEol(verificarInstalacionBat), "utf8");
 
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 const readme = `# AutoDetail SaaS Pro — paquete Windows (v${version})

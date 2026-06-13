@@ -116,7 +116,8 @@ export function AppointmentSideDrawer({ appointmentId, onClose }: Props) {
               <ul className="app-drawer__list">
                 {data.orderServices.map((s) => (
                   <li key={s.id}>
-                    Servicio {String(s.service_id).slice(0, 8)}… · ${Number(s.price).toFixed(2)}
+                    Servicio {String(s.service_id).slice(0, 8)}…
+                    {"price" in s && s.price != null ? ` · $${Number(s.price).toFixed(2)}` : ""}
                   </li>
                 ))}
               </ul>

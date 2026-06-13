@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { badRequest, internalError, ok } from "@/lib/api-response";
 import { requirePermission } from "@/lib/permissions";
-import { getAllClients } from "@/modules/clients/client.service";
+import { getAllClients, searchClientsForOrderIdentification } from "@/modules/clients/client.service";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +9,12 @@ export async function GET(request: NextRequest) {
     if ("denied" in auth) return auth.denied;
 
     const search = request.nextUrl.searchParams.get("search") ?? undefined;
-    const clients = await getAllClients(search);
+    const forOrder = request.nextUrl.searchParams.get("forOrder") === "1";
+    const clients = search
+      ? forOrder
+        ? await searchClientsForOrderIdentification(search)
+        : await getAllClients(search)
+      : await getAllClients();
     return ok(clients);
   } catch (error) {
     return internalError(error);

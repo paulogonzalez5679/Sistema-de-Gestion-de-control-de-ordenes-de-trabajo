@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { internalError, notFound, ok } from "@/lib/api-response";
 import { requirePermission } from "@/lib/permissions";
+import { redactServicePricing, stripServicePricingFromPayload } from "@/lib/service-pricing-access";
 import { recordAuditEvent } from "@/modules/audit/audit.service";
 import { deleteService, getServiceById, updateService } from "@/modules/services/service.service";
 
@@ -14,7 +15,7 @@ export async function GET(_: NextRequest, { params }: Params) {
     const { id } = await params;
     const service = await getServiceById(id);
     if (!service) return notFound("Service");
-    return ok(service);
+    return ok(redactServicePricing(service, auth.profile.role));
   } catch (error) {
     return internalError(error);
   }
@@ -26,9 +27,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if ("denied" in auth) return auth.denied;
 
     const { id } = await params;
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
     const before = await getServiceById(id);
-    const updated = await updateService(id, body);
+    const updated = await updateService(id, stripServicePricingFromPayload(body, auth.profile.role));
     if (!updated) return notFound("Service");
     const actor = auth.profile;
     await recordAuditEvent({
@@ -40,7 +41,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       summary: `${actor.full_name} actualizó el servicio «${before?.name ?? updated.name}».`,
       metadata: { service_id: id }
     });
-    return ok(updated);
+    return ok(redactServicePricing(updated, auth.profile.role));
   } catch (error) {
     return internalError(error);
   }

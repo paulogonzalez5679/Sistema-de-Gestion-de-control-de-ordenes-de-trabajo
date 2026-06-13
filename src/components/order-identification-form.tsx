@@ -12,6 +12,7 @@ type Client = {
   full_name: string;
   phone: string;
   email: string | null;
+  cedula: string | null;
 };
 
 type Vehicle = {
@@ -25,6 +26,12 @@ type Vehicle = {
 };
 
 type PlateLookupState = "idle" | "loading" | "found" | "not_found";
+type ClientSearchState = "idle" | "loading" | "multiple" | "not_found";
+
+function formatClientDocument(client: Client): string | null {
+  const doc = client.cedula?.trim();
+  return doc ? doc : null;
+}
 
 function OrderStepTitle({ backHref, children }: { backHref: string; children: ReactNode }) {
   return (
@@ -44,6 +51,10 @@ export function OrderIdentificationForm() {
 
   const [plate, setPlate] = useState("");
   const [plateLookupState, setPlateLookupState] = useState<PlateLookupState>("idle");
+  const [clientQuery, setClientQuery] = useState("");
+  const [clientSearchState, setClientSearchState] = useState<ClientSearchState>("idle");
+  const [clientMatches, setClientMatches] = useState<Client[]>([]);
+  const [pickedClientMatchId, setPickedClientMatchId] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
 
@@ -152,6 +163,12 @@ export function OrderIdentificationForm() {
     };
   }, [presetClientId, router]);
 
+  function resetClientSearchState() {
+    setClientSearchState("idle");
+    setClientMatches([]);
+    setPickedClientMatchId(null);
+  }
+
   function resetPlateDerivedState() {
     setPlateLookupState("idle");
     setVehicle(null);
@@ -166,14 +183,73 @@ export function OrderIdentificationForm() {
 
   function handlePlateChange(value: string) {
     setPlate(value.toUpperCase());
+    resetClientSearchState();
+    setClientQuery("");
     if (plateLookupState !== "idle") {
       resetPlateDerivedState();
     }
   }
 
-  async function lookupPlate() {
-    const trimmed = plate.trim();
+  function handleClientQueryChange(value: string) {
+    setClientQuery(value);
+    resetClientSearchState();
+    if (plateLookupState !== "idle") {
+      setPlate("");
+      resetPlateDerivedState();
+    }
+  }
+
+  async function lookupClient() {
+    const trimmed = clientQuery.trim();
     if (!trimmed) return;
+
+    setError(null);
+    setClientSearchState("loading");
+    setClientMatches([]);
+    setPickedClientMatchId(null);
+
+    try {
+      const response = await fetch(`/api/clients?forOrder=1&search=${encodeURIComponent(trimmed)}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(typeof data?.error === "string" ? data.error : "No se pudo buscar el cliente.");
+      }
+
+      const matches = Array.isArray(data) ? (data as Client[]) : [];
+      if (matches.length === 0) {
+        setClientSearchState("not_found");
+        return;
+      }
+
+      if (matches.length === 1) {
+        router.replace(`/dashboard/orders/new/identify?clientId=${matches[0].id}`);
+        return;
+      }
+
+      setClientMatches(matches);
+      setClientSearchState("multiple");
+    } catch (caught) {
+      setClientSearchState("idle");
+      setError(caught instanceof Error ? caught.message : "No se pudo buscar el cliente.");
+    }
+  }
+
+  function onClientMatchContinue() {
+    if (!pickedClientMatchId) {
+      setError("Selecciona un cliente para continuar.");
+      return;
+    }
+    setError(null);
+    router.replace(`/dashboard/orders/new/identify?clientId=${pickedClientMatchId}`);
+  }
+
+  async function lookupPlate() {
+    const trimmed = plate.trim().toUpperCase();
+    if (!trimmed) return;
+
+    if (trimmed !== plate) {
+      setPlate(trimmed);
+    }
 
     setError(null);
     setPlateLookupState("loading");
@@ -250,6 +326,11 @@ export function OrderIdentificationForm() {
 
   const showUnregisteredPanel =
     !presetClientId && plateLookupState === "not_found" && plate.trim().length > 0;
+
+  const showClientSearchFlow = !presetClientId;
+  const showClientMultiplePicker = showClientSearchFlow && clientSearchState === "multiple";
+  const showClientNotFoundPanel =
+    showClientSearchFlow && clientSearchState === "not_found" && clientQuery.trim().length > 0;
 
   /** Con cliente preseleccionado no pedimos matrícula: se elige vehículo o se redirige. */
   const showMatriculaFlow = !presetClientId;
@@ -410,44 +491,141 @@ export function OrderIdentificationForm() {
       ) : null}
 
       {showMatriculaFlow ? (
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Identificación del vehículo</h3>
-          <label>
-            Matrícula *
-            <input
-              className="input"
-              value={plate}
-              onChange={(e) => handlePlateChange(e.target.value)}
-              placeholder="INTRODUCE LA MATRÍCULA"
-              required
-              autoComplete="off"
-            />
-          </label>
-          <button
-            type="button"
-            className="button secondary"
-            onClick={() => void lookupPlate()}
-            disabled={plateLookupState === "loading"}
-            style={{ marginTop: 12 }}
-          >
-            <span className="btn-loading-inner">
-              {plateLookupState === "loading" ? <InlineSpinner size="sm" /> : null}
-              {plateLookupState === "loading" ? "Buscando…" : "Buscar"}
-            </span>
-          </button>
+        <>
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>Buscar cliente</h3>
+            <p style={{ color: "#b9accf", marginTop: 0, fontSize: "0.9rem" }}>
+              Cédula (10 dígitos), RUC (13 dígitos) o nombre/apellido del cliente.
+            </p>
+            <label>
+              Documento o nombre
+              <input
+                className="input"
+                value={clientQuery}
+                onChange={(e) => handleClientQueryChange(e.target.value)}
+                placeholder="Ej. 1712345678, 1791234567001 o Juan Pérez"
+                autoComplete="off"
+              />
+            </label>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => void lookupClient()}
+              disabled={clientSearchState === "loading" || clientQuery.trim().length === 0}
+              style={{ marginTop: 12 }}
+            >
+              <span className="btn-loading-inner">
+                {clientSearchState === "loading" ? <InlineSpinner size="sm" /> : null}
+                {clientSearchState === "loading" ? "Buscando…" : "Buscar cliente"}
+              </span>
+            </button>
+          </div>
 
-          {vehicle ? (
-            <div style={{ marginTop: 14 }}>
-              <p style={{ color: "#8fd2ff", marginBottom: 6 }}>
-                Vehículo encontrado: {vehicle.make} {vehicle.model}
-                {vehicle.year ? ` (${vehicle.year})` : ""}
+          {showClientMultiplePicker ? (
+            <div className="card">
+              <h3 style={{ marginTop: 0 }}>Varios clientes encontrados</h3>
+              <p style={{ color: "#b9accf", marginTop: 0, marginBottom: 16, fontSize: "0.95rem" }}>
+                Selecciona el cliente correcto para continuar con la orden.
               </p>
-              <p style={{ color: "#b9accf", margin: 0, fontSize: "0.9rem" }}>
-                Matrícula en sistema: {vehicle.plate}
-              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {clientMatches.map((client) => {
+                  const selected = pickedClientMatchId === client.id;
+                  const doc = formatClientDocument(client);
+                  return (
+                    <label
+                      key={client.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        padding: "14px 16px",
+                        borderRadius: 12,
+                        border: selected ? "1px solid rgba(157, 92, 255, 0.65)" : "1px solid #2a203d",
+                        background: selected ? "rgba(123, 0, 255, 0.12)" : "#181226",
+                        cursor: "pointer"
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="client-match"
+                        checked={selected}
+                        onChange={() => setPickedClientMatchId(client.id)}
+                        style={{ marginTop: 4 }}
+                      />
+                      <span>
+                        <span style={{ display: "block", fontWeight: 700, color: "#f6f3ff" }}>{client.full_name}</span>
+                        <span style={{ display: "block", color: "#b9accf", fontSize: "0.88rem", marginTop: 4 }}>
+                          {doc ? `Cédula/RUC ${doc}` : "Sin documento registrado"}
+                          {client.phone ? ` · ${client.phone}` : ""}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <button type="button" className="button" style={{ marginTop: 18 }} onClick={onClientMatchContinue}>
+                Continuar con este cliente
+              </button>
             </div>
           ) : null}
-        </div>
+
+          {showClientNotFoundPanel ? (
+            <div className="card">
+              <h3 style={{ marginTop: 0 }}>Cliente no encontrado</h3>
+              <p style={{ color: "#b9accf", marginTop: 0 }}>
+                No hay ningún cliente que coincida con <strong>{clientQuery.trim()}</strong>. Regístralo para poder
+                crear la orden.
+              </p>
+              <Link className="button" href="/dashboard/clients/new?forOrder=1">
+                Registrar nuevo cliente
+              </Link>
+            </div>
+          ) : null}
+
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>Identificación por matrícula</h3>
+            <p style={{ color: "#b9accf", marginTop: 0, fontSize: "0.9rem" }}>
+              También puedes localizar al cliente buscando la placa del vehículo.
+            </p>
+            <label>
+              Matrícula *
+              <input
+                className="input registration-input-plate"
+                value={plate}
+                onChange={(e) => handlePlateChange(e.target.value)}
+                placeholder="INTRODUCE LA MATRÍCULA"
+                autoComplete="off"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </label>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => void lookupPlate()}
+              disabled={plateLookupState === "loading" || plate.trim().length === 0}
+              style={{ marginTop: 12 }}
+            >
+              <span className="btn-loading-inner">
+                {plateLookupState === "loading" ? <InlineSpinner size="sm" /> : null}
+                {plateLookupState === "loading" ? "Buscando…" : "Buscar matrícula"}
+              </span>
+            </button>
+
+            {vehicle ? (
+              <div style={{ marginTop: 14 }}>
+                <p style={{ color: "#8fd2ff", marginBottom: 6 }}>
+                  Vehículo encontrado: {vehicle.make} {vehicle.model}
+                  {vehicle.year ? ` (${vehicle.year})` : ""}
+                </p>
+                <p style={{ color: "#b9accf", margin: 0, fontSize: "0.9rem" }}>
+                  Matrícula en sistema: {vehicle.plate}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </>
       ) : null}
 
       {showUnregisteredPanel ? (
@@ -474,6 +652,11 @@ export function OrderIdentificationForm() {
             <strong>{selectedClient!.full_name}</strong>
           </p>
           <p style={{ color: "#b9accf", margin: "4px 0" }}>Teléfono: {selectedClient!.phone}</p>
+          {formatClientDocument(selectedClient!) ? (
+            <p style={{ color: "#b9accf", margin: "4px 0" }}>
+              Cédula/RUC: {formatClientDocument(selectedClient!)}
+            </p>
+          ) : null}
           {selectedClient!.email ? (
             <p style={{ color: "#b9accf", margin: "4px 0 0" }}>Correo: {selectedClient!.email}</p>
           ) : null}

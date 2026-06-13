@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ListPagination } from "@/components/list-pagination";
 import type { Service } from "@/lib/types";
 import { CARD_GRID_PAGE_SIZE, offsetForPage, parsePageParam } from "@/lib/pagination";
-import { canManageServiceCatalog } from "@/lib/roles";
+import { canManageServiceCatalog, canViewServicePricing } from "@/lib/roles";
 import { getSessionProfile } from "@/lib/session-profile";
 import { getAllServices } from "@/modules/services/service.service";
 
@@ -16,6 +16,7 @@ export default async function ServicesCatalogPage({ searchParams }: Props) {
   if (!canManageServiceCatalog(profile?.role)) {
     redirect("/dashboard");
   }
+  const showPricing = canViewServicePricing(profile?.role);
 
   const sp = await searchParams;
   const services = await getAllServices(false);
@@ -46,7 +47,7 @@ export default async function ServicesCatalogPage({ searchParams }: Props) {
         <h2 className="svc-catalog-h2">Paquetes (bundles)</h2>
         <div className="svc-catalog-grid">
           {bundlesSlice.map((s) => (
-            <CatalogCard key={s.id} service={s} />
+            <CatalogCard key={s.id} service={s} showPricing={showPricing} />
           ))}
         </div>
         {bundles.length === 0 ? (
@@ -66,7 +67,7 @@ export default async function ServicesCatalogPage({ searchParams }: Props) {
         <h2 className="svc-catalog-h2">Servicios y complementos</h2>
         <div className="svc-catalog-grid">
           {addonsSlice.map((s) => (
-            <CatalogCard key={s.id} service={s} />
+            <CatalogCard key={s.id} service={s} showPricing={showPricing} />
           ))}
         </div>
         {addons.length === 0 ? (
@@ -85,7 +86,7 @@ export default async function ServicesCatalogPage({ searchParams }: Props) {
   );
 }
 
-function CatalogCard({ service }: { service: Service }) {
+function CatalogCard({ service, showPricing }: { service: Service; showPricing: boolean }) {
   return (
     <div className={`svc-catalog-card ${service.is_active ? "" : "svc-catalog-card-inactive"}`}>
       <div className="svc-catalog-card-top">
@@ -103,7 +104,7 @@ function CatalogCard({ service }: { service: Service }) {
         <p className="svc-catalog-card-desc muted">Sin descripción</p>
       )}
       <div className="svc-catalog-card-meta">
-        <span>${Number(service.base_price).toFixed(2)}</span>
+        {showPricing ? <span>${Number(service.base_price).toFixed(2)}</span> : null}
         <span>{service.estimated_minutes} min</span>
         <span>{Number(service.reward_points ?? 0)} pts</span>
       </div>

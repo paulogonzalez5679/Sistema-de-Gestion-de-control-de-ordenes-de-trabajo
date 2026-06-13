@@ -6,8 +6,8 @@ import { FormEvent, useState } from "react";
 import type { Service } from "@/lib/types";
 
 type Props =
-  | { mode: "create"; initial?: undefined }
-  | { mode: "edit"; initial: Service };
+  | { mode: "create"; initial?: undefined; canViewPricing: boolean }
+  | { mode: "edit"; initial: Service; canViewPricing: boolean };
 
 export function ServiceForm(props: Props) {
   const router = useRouter();
@@ -33,15 +33,17 @@ export function ServiceForm(props: Props) {
     setError(null);
     try {
       const rp = Math.max(0, Math.floor(Number(rewardPoints) || 0));
-      const payload = {
+      const payload: Record<string, unknown> = {
         name: name.trim(),
         description: description.trim() || null,
-        base_price: Number(basePrice) || 0,
         estimated_minutes: Number(estimatedMinutes) || 60,
         is_bundle: isBundle,
         is_active: isActive,
         reward_points: rp
       };
+      if (props.canViewPricing) {
+        payload.base_price = Number(basePrice) || 0;
+      }
       if (!payload.name) throw new Error("El nombre es obligatorio.");
 
       if (props.mode === "create") {
@@ -111,17 +113,19 @@ export function ServiceForm(props: Props) {
       </label>
 
       <div className="row two">
-        <label>
-          Precio base
-          <input
-            className="input"
-            type="number"
-            min={0}
-            step={0.01}
-            value={basePrice}
-            onChange={(e) => setBasePrice(e.target.value)}
-          />
-        </label>
+        {props.canViewPricing ? (
+          <label>
+            Precio base
+            <input
+              className="input"
+              type="number"
+              min={0}
+              step={0.01}
+              value={basePrice}
+              onChange={(e) => setBasePrice(e.target.value)}
+            />
+          </label>
+        ) : null}
         <label>
           Duración estimada (min)
           <input

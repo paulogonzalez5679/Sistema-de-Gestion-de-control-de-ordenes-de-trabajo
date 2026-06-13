@@ -151,6 +151,26 @@ Guia: docs/instalacion-windows-standalone.md (en el repo del desarrollador).
 
 writeFileSync(join(outDir, "LEEME.txt"), readme, "utf8");
 
+const packagedDataDir = join(dirname(outDir), "KenzoStudioData");
+mkdirSync(join(packagedDataDir, "config"), { recursive: true });
+mkdirSync(join(packagedDataDir, "media"), { recursive: true });
+writeFileSync(
+  join(packagedDataDir, "LEEME.txt"),
+  `Kenzo Studio — datos locales del taller
+
+Las fotos de ingreso de órdenes y la configuración de almacenamiento se guardan aquí.
+No elimine esta carpeta al actualizar la aplicación.
+
+Estructura:
+  config/settings.json  — ruta personalizada de fotos (opcional)
+  media/orders/         — fotos por orden
+
+La aplicación usa esta carpeta cuando se ejecuta desde la carpeta del paquete Windows
+(ruta predeterminada: ../KenzoStudioData respecto al servidor).
+`,
+  "utf8"
+);
+
 console.log("\n3/3  Paquete listo.\n");
 console.log(`  Carpeta: ${outDir}`);
 console.log(`  BUILD-INFO: INCOMPATIBLE_CON_WINDOWS=${incompatible ? "si" : "no"}`);

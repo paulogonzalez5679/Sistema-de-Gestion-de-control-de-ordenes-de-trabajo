@@ -624,3 +624,110 @@ export async function getAppointmentEnriched(id: string): Promise<AppointmentEnr
     orderServices: (orderServices ?? []) as WorkOrderService[]
   };
 }
+
+/** Instantáneo usado para ubicar la orden en el calendario de historial. */
+export function resolveOrderHistoryAt(order: WorkOrder): string | null {
+  if (order.status === "pending_invoice") {
+    return order.completed_at ?? order.updated_at;
+  }
+  if (order.status === "invoiced") {
+    return order.updated_at;
+  }
+  return null;
+}
+
+export type OrderHistoryEntry = WorkOrderListEnriched & {
+  history_at: string;
+};
+
+export async function listOrderHistoryInRange(options: {
+  startISO: string;
+  endISO: string;
+  assigneeUserId?: string;
+}): Promise<OrderHistoryEntry[]> {
+  const supabase = createSupabaseAdminClient();
+  let query = supabase
+    .from("work_orders")
+    .select("*")
+    .in("status", ["pending_invoice", "invoiced"])
+    .order("updated_at", { ascending: true });
+
+  if (options.assigneeUserId) {
+    query = query.eq("assigned_to", options.assigneeUserId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const startMs = new Date(options.startISO).getTime();
+  const endMs = new Date(options.endISO).getTime();
+
+  const inRange = (data ?? [])
+    .map((row) => row as WorkOrder)
+    .filter((order) => {
+      const historyAt = resolveOrderHistoryAt(order);
+      if (!historyAt) return false;
+      const t = new Date(historyAt).getTime();
+      return t >= startMs && t < endMs;
+    });
+
+  const enriched = await enrichWorkOrdersForList(inRange);
+  return enriched.flatMap((order) => {
+    const history_at = resolveOrderHistoryAt(order);
+    return history_at ? [{ ...order, history_at }] : [];
+  });
+}
+
+export type OrderHistoryDetail = {
+  order: WorkOrder;
+  client: Client | null;
+  vehicle: Vehicle | null;
+  orderServices: Array<WorkOrderService & { service_name: string | null }>;
+  productLines: OrderProductLineEnriched[];
+  assigneeName: string | null;
+};
+
+export async function getOrderHistoryDetail(orderId: string): Promise<OrderHistoryDetail | null> {
+  const order = await getOrderById(orderId);
+  if (!order) return null;
+  if (order.status !== "pending_invoice" && order.status !== "invoiced") return null;
+
+  const supabase = createSupabaseAdminClient();
+  const [{ data: client }, { data: vehicle }, { data: serviceRows }, productLines] = await Promise.all([
+    supabase.from("clients").select("*").eq("id", order.client_id).maybeSingle(),
+    supabase.from("vehicles").select("*").eq("id", order.vehicle_id).maybeSingle(),
+    supabase
+      .from("work_order_services")
+      .select("*, services(name)")
+      .eq("work_order_id", orderId)
+      .order("created_at", { ascending: true }),
+    getOrderProductsEnriched(orderId)
+  ]);
+
+  let assigneeName: string | null = null;
+  if (order.assigned_to) {
+    const { data: assignee } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", order.assigned_to)
+      .maybeSingle();
+    assigneeName = assignee?.full_name ?? null;
+  }
+
+  const orderServices = (serviceRows ?? []).map((row) => {
+    const r = row as WorkOrderService & { services: { name: string } | { name: string }[] | null };
+    const svc = r.services;
+    const nameObj = Array.isArray(svc) && svc[0] ? svc[0] : svc && !Array.isArray(svc) ? svc : null;
+    const { services: _removed, ...rest } = r;
+    return { ...rest, service_name: nameObj?.name ?? null };
+  });
+
+  return {
+    order,
+    client: (client ?? null) as Client | null,
+    vehicle: (vehicle ?? null) as Vehicle | null,
+    orderServices,
+    productLines,
+    assigneeName
+  };
+}

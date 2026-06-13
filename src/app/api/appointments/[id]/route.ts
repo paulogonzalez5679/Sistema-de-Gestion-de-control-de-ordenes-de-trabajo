@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { ecuadorWallDateTimeToUtcIso } from "@/lib/app-timezone";
 import { badRequest, forbidden, internalError, notFound, ok } from "@/lib/api-response";
 import { requirePermission } from "@/lib/permissions";
+import { canViewAllWorkOrders } from "@/lib/roles";
+import { redactWorkOrderServicePricing } from "@/lib/service-pricing-access";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import {
   createOrUpdateAppointment,
@@ -21,7 +23,7 @@ async function gateAppointmentByAssignee(
 ): Promise<{ ok: true; data: AppointmentEnrichedDetail } | { ok: false; response: Response }> {
   const data = await getAppointmentEnriched(appointmentId);
   if (!data) return { ok: false, response: notFound("Appointment") };
-  if (profile.role === "admin") return { ok: true, data };
+  if (canViewAllWorkOrders(profile.role)) return { ok: true, data };
   const assignee = data.order?.assigned_to ?? null;
   if (!assignee || assignee !== profile.id) {
     return { ok: false, response: forbidden(APPOINTMENT_ASSIGNMENT_FORBIDDEN) };
@@ -37,7 +39,11 @@ export async function GET(_: NextRequest, { params }: Params) {
     const { id } = await params;
     const gate = await gateAppointmentByAssignee(auth.profile, id);
     if (!gate.ok) return gate.response;
-    return ok(gate.data);
+    const { orderServices, ...rest } = gate.data;
+    return ok({
+      ...rest,
+      orderServices: orderServices.map((line) => redactWorkOrderServicePricing(line, auth.profile.role))
+    });
   } catch (error) {
     return internalError(error);
   }

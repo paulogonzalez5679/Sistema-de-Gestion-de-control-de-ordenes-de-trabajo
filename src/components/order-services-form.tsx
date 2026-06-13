@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { InventoryItem, WorkOrderPriority } from "@/lib/types";
 import { formatPriority, formatProfileRole } from "@/lib/ui-labels";
 import { ResponsiveSelect } from "@/components/responsive-select";
+import {
+  INTAKE_MIN_PHOTOS,
+  OrderIntakePhotosField
+} from "@/components/order-intake-photos-field";
 
 const PRIORITY_OPTIONS: WorkOrderPriority[] = ["low", "normal", "high", "urgent"];
 
@@ -31,11 +35,21 @@ export type OrderServicesFormProps = {
   currentUserId: string;
   /** Nombre visible cuando la orden se autoasigna (no admin). */
   currentUserName: string;
-  /** Solo administrador puede elegir otro responsable; el resto queda autoasignado en servidor. */
+  /** Solo administrador y gerencia pueden elegir otro responsable; el resto queda autoasignado en servidor. */
   canPickAssignee: boolean;
+  /** Solo administrador puede ver precios de servicios. */
+  canViewServicePricing: boolean;
+  /** Admin y gerencia pueden aplicar descuento al crear la orden. */
+  canApplyDiscount: boolean;
 };
 
-export function OrderServicesForm({ currentUserId, currentUserName, canPickAssignee }: OrderServicesFormProps) {
+export function OrderServicesForm({
+  currentUserId,
+  currentUserName,
+  canPickAssignee,
+  canViewServicePricing,
+  canApplyDiscount
+}: OrderServicesFormProps) {
   const router = useRouter();
   const params = useSearchParams();
   const clientId = params.get("clientId");
@@ -58,6 +72,9 @@ export function OrderServicesForm({ currentUserId, currentUserName, canPickAssig
   const [scheduledStart, setScheduledStart] = useState("");
   const [scheduledEnd, setScheduledEnd] = useState("");
   const [notes, setNotes] = useState("");
+  const [intakeNotes, setIntakeNotes] = useState("");
+  const [intakePhotos, setIntakePhotos] = useState<File[]>([]);
+  const [discountAmount, setDiscountAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialDataLoading, setInitialDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +145,13 @@ export function OrderServicesForm({ currentUserId, currentUserName, canPickAssig
   );
 
   const total = servicesTotal + productsTotal;
+  const parsedDiscount = useMemo(() => {
+    if (!canApplyDiscount) return 0;
+    const raw = discountAmount.trim() === "" ? 0 : Number(discountAmount);
+    if (!Number.isFinite(raw) || raw < 0) return 0;
+    return raw;
+  }, [canApplyDiscount, discountAmount]);
+  const estimatedTotal = Math.max(0, total - parsedDiscount);
 
   const inventoryMap = useMemo(() => new Map(inventory.map((item) => [item.id, item])), [inventory]);
 
@@ -288,6 +312,21 @@ export function OrderServicesForm({ currentUserId, currentUserName, canPickAssig
       if (!notes.trim()) {
         throw new Error("Las notas de la orden son obligatorias.");
       }
+      if (!intakeNotes.trim() || intakeNotes.trim().length < 3) {
+        throw new Error("Los detalles de ingreso del vehículo son obligatorios.");
+      }
+      if (intakePhotos.length < INTAKE_MIN_PHOTOS) {
+        throw new Error(`Debe adjuntar al menos ${INTAKE_MIN_PHOTOS} foto de ingreso.`);
+      }
+      if (canApplyDiscount && discountAmount.trim() !== "") {
+        const discount = Number(discountAmount);
+        if (!Number.isFinite(discount) || discount < 0) {
+          throw new Error("El descuento no es válido.");
+        }
+        if (canViewServicePricing && discount > total) {
+          throw new Error("El descuento no puede ser mayor que el subtotal estimado.");
+        }
+      }
 
       const assigneeId = (canPickAssignee ? assignedTo : currentUserId).trim();
       if (!assigneeId) {
@@ -308,9 +347,11 @@ export function OrderServicesForm({ currentUserId, currentUserName, canPickAssig
             priority,
             scheduled_start: scheduledStart,
             scheduled_end: scheduledEnd,
-            notes: notes.trim()
+            notes: notes.trim(),
+            ...(canApplyDiscount && parsedDiscount > 0 ? { discount_amount: parsedDiscount } : {})
           },
-          services: selectedItems.map((service) => ({ service_id: service.id, price: service.base_price })),
+          // El servidor persiste el precio desde el catálogo; el cliente solo indica qué servicios van.
+          services: selectedItems.map((service) => ({ service_id: service.id, price: 0 })),
           products: draftProducts.map((d) => ({ item_id: d.item_id, quantity: d.quantity, unit_price: d.unit_price }))
         })
       });
@@ -333,6 +374,24 @@ export function OrderServicesForm({ currentUserId, currentUserName, canPickAssig
         const payload = await appointmentRes.json().catch(() => ({}));
         throw new Error(
           typeof payload?.error === "string" ? payload.error : "No se pudo crear la cita en el calendario."
+        );
+      }
+
+      const intakeForm = new FormData();
+      intakeForm.append("intake_condition_notes", intakeNotes.trim());
+      for (const photo of intakePhotos) {
+        intakeForm.append("photos", photo);
+      }
+      const intakeRes = await fetch(`/api/orders/${encodeURIComponent(order.id)}/intake`, {
+        method: "POST",
+        body: intakeForm
+      });
+      if (!intakeRes.ok) {
+        const payload = await intakeRes.json().catch(() => ({}));
+        throw new Error(
+          typeof payload?.error === "string"
+            ? payload.error
+            : "La orden se creó pero no se pudieron guardar las fotos de ingreso."
         );
       }
 
@@ -372,7 +431,9 @@ export function OrderServicesForm({ currentUserId, currentUserName, canPickAssig
                 />
                 <span style={{ marginLeft: 8, fontWeight: 600 }}>{service.name}</span>
                 <div style={{ color: "#b9accf", marginTop: 4 }}>{service.description}</div>
-                <div style={{ marginTop: 4 }}>${Number(service.base_price).toFixed(2)}</div>
+                {canViewServicePricing ? (
+                  <div style={{ marginTop: 4 }}>${Number(service.base_price ?? 0).toFixed(2)}</div>
+                ) : null}
               </label>
             ))}
           </div>
@@ -651,24 +712,61 @@ export function OrderServicesForm({ currentUserId, currentUserName, canPickAssig
             required
           />
         </label>
+        {canApplyDiscount ? (
+          <label style={{ marginTop: 10 }}>
+            Descuento (opcional)
+            <input
+              className="input"
+              type="number"
+              min={0}
+              step={0.01}
+              value={discountAmount}
+              onChange={(e) => setDiscountAmount(e.target.value)}
+              placeholder="0.00"
+            />
+            <span style={{ display: "block", marginTop: 6, fontSize: "0.82rem", color: "#b9accf" }}>
+              Monto en dólares a descontar del total de la orden. También podrás ajustarlo antes de facturar.
+            </span>
+          </label>
+        ) : null}
+        <OrderIntakePhotosField
+          notes={intakeNotes}
+          onNotesChange={setIntakeNotes}
+          photos={intakePhotos}
+          onPhotosChange={setIntakePhotos}
+          disabled={loading}
+        />
         <div className="card order-summary-card" style={{ marginTop: 12 }}>
           <h4 style={{ marginTop: 0 }}>Resumen de la orden</h4>
           <div className="order-summary-line">
             <span>{selectedItems.length} servicios</span>
-            <span>${servicesTotal.toFixed(2)}</span>
+            {canViewServicePricing ? <span>${servicesTotal.toFixed(2)}</span> : null}
           </div>
           {draftProducts.length > 0 ? (
             <div className="order-summary-line">
               <span>
                 {draftProducts.reduce((acc, d) => acc + d.quantity, 0)} producto(s)
               </span>
-              <span>${productsTotal.toFixed(2)}</span>
+              {canViewServicePricing ? <span>${productsTotal.toFixed(2)}</span> : null}
             </div>
           ) : null}
-          <div className="order-summary-line order-summary-line--total">
-            <span>Total estimado</span>
-            <strong>${total.toFixed(2)}</strong>
-          </div>
+          {canApplyDiscount && parsedDiscount > 0 ? (
+            <div className="order-summary-line">
+              <span>Descuento</span>
+              <span>-${parsedDiscount.toFixed(2)}</span>
+            </div>
+          ) : null}
+          {canViewServicePricing ? (
+            <div className="order-summary-line order-summary-line--total">
+              <span>Total estimado</span>
+              <strong>${estimatedTotal.toFixed(2)}</strong>
+            </div>
+          ) : canApplyDiscount && parsedDiscount > 0 ? (
+            <div className="order-summary-line order-summary-line--total">
+              <span>Descuento aplicado</span>
+              <strong>${parsedDiscount.toFixed(2)}</strong>
+            </div>
+          ) : null}
         </div>
         {error ? <p style={{ color: "#ff8f9c" }}>{error}</p> : null}
         <button className="button" style={{ marginTop: 12 }} type="submit" disabled={loading}>

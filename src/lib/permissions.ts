@@ -24,6 +24,7 @@ export type Permission =
   | "orders.add_note"
   | "orders.upload_image"
   | "orders.view_audit_beacon"
+  | "orders.view_history"
   | "orders.transition_billing"
   | "orders.apply_discount"
   | "orders.edit_details"
@@ -36,6 +37,7 @@ export type Permission =
   | "vehicles.update"
   | "vehicles.delete"
   | "services.read"
+  | "services.view_pricing"
   | "services.manage"
   | "inventory.read"
   | "inventory.create"
@@ -60,6 +62,7 @@ export type Permission =
   | "profiles.read_self"
   | "profiles.read_staff_list"
   | "profiles.manage"
+  | "settings.manage"
   | "dashboard.global_search";
 
 const ALL_ROLES: ProfileRole[] = ["admin", "manager", "operator", "detailer"];
@@ -72,7 +75,7 @@ const ADMIN_ONLY: ProfileRole[] = ["admin"];
  */
 const MATRIX: Record<Permission, ProfileRole[]> = {
   "orders.read": ALL_ROLES,
-  /** Alta de orden en flujo guiado: taller (operador/detallista) y gerencia; el asignatario lo fija la API salvo admin. */
+  /** Alta de orden en flujo guiado: taller (operador/detallista) y gerencia; el asignatario lo fija la API salvo gerencia/admin. */
   "orders.create": ALL_ROLES,
   "orders.update": ALL_ROLES,
   "orders.edit_details": ADMIN_ONLY,
@@ -83,8 +86,9 @@ const MATRIX: Record<Permission, ProfileRole[]> = {
   "orders.add_note": ALL_ROLES,
   "orders.upload_image": ALL_ROLES,
   "orders.view_audit_beacon": ALL_ROLES,
+  "orders.view_history": ADMIN_ONLY,
   "orders.transition_billing": ADMIN_ONLY,
-  "orders.apply_discount": ADMIN_ONLY,
+  "orders.apply_discount": MANAGEMENT_ROLES,
 
   "clients.read": ALL_ROLES,
   /** Registro completo cliente+vehículo desde el flujo de orden (matrícula no encontrada). */
@@ -98,6 +102,7 @@ const MATRIX: Record<Permission, ProfileRole[]> = {
   "vehicles.delete": ADMIN_ONLY,
 
   "services.read": ALL_ROLES,
+  "services.view_pricing": ADMIN_ONLY,
   "services.manage": MANAGEMENT_ROLES,
 
   "inventory.read": [...MANAGEMENT_ROLES, "operator", "detailer"],
@@ -129,6 +134,7 @@ const MATRIX: Record<Permission, ProfileRole[]> = {
   "profiles.read_self": ALL_ROLES,
   "profiles.read_staff_list": ALL_ROLES,
   "profiles.manage": ADMIN_ONLY,
+  "settings.manage": ADMIN_ONLY,
 
   "dashboard.global_search": MANAGEMENT_ROLES
 };

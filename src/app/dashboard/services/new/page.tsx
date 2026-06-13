@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ServiceForm } from "@/components/service-form";
-import { canManageServiceCatalog } from "@/lib/roles";
+import { canManageServiceCatalog, canViewServicePricing } from "@/lib/roles";
 import { getSessionProfile } from "@/lib/session-profile";
 
 export default async function NewServicePage() {
@@ -12,7 +12,7 @@ export default async function NewServicePage() {
   return (
     <div className="row">
       <h1 style={{ margin: 0 }}>Nuevo servicio</h1>
-      <ServiceForm mode="create" />
+      <ServiceForm mode="create" canViewPricing={canViewServicePricing(profile?.role)} />
     </div>
   );
 }

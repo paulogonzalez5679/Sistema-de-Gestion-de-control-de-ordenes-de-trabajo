@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import type { ProfileRole } from "@/lib/types";
-import { canManageInventory, canManageServiceCatalog, canManageUsers } from "@/lib/roles";
+import { canManageAppSettings, canManageInventory, canManageServiceCatalog, canManageUsers } from "@/lib/roles";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const SIDEBAR_COLLAPSED_KEY = "luxe-sidebar-collapsed";
@@ -12,6 +12,7 @@ const SIDEBAR_COLLAPSED_KEY = "luxe-sidebar-collapsed";
 const catalogLink = { href: "/dashboard/services", label: "Catálogo", icon: "home_repair_service" };
 const usersLink = { href: "/dashboard/users", label: "Usuarios", icon: "badge" };
 const auditLink = { href: "/dashboard/audit", label: "Auditoría", icon: "fact_check" };
+const settingsLink: NavLinkItem = { href: "/dashboard/settings", label: "Configuración", icon: "settings" };
 
 type NavLinkItem = { href: string; label: string; icon: string };
 
@@ -87,6 +88,7 @@ export function DashboardShell({
   if (canManageInventory(userRole)) links = [...links.slice(0, 3), inventoryLink, ...links.slice(3)];
   if (canManageServiceCatalog(userRole)) links = [...links, catalogLink];
   if (canManageUsers(userRole)) links = [...links, rewardsLink, usersLink, auditLink];
+  if (canManageAppSettings(userRole)) links = [...links, settingsLink];
 
   useEffect(() => {
     setHydrated(true);

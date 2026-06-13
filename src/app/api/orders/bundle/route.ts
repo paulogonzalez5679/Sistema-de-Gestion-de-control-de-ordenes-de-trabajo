@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { ecuadorWallDateTimeToUtcIso } from "@/lib/app-timezone";
 import { badRequest, internalError, ok } from "@/lib/api-response";
-import { canPickOrderAssignee } from "@/lib/roles";
-import { requirePermission } from "@/lib/permissions";
+import { canPickOrderAssignee, canViewAllWorkOrders, canViewServicePricing } from "@/lib/roles";
+import { hasPermission, requirePermission } from "@/lib/permissions";
+import { resolveServiceLinePricesFromCatalog } from "@/lib/service-pricing-access";
 import { createWorkOrderBundleSchema } from "@/lib/schemas/work-order";
 import { createWorkOrderBundle } from "@/modules/orders/order-bundle.usecase";
 
@@ -45,6 +46,11 @@ export async function POST(request: NextRequest) {
       return badRequest("Las fechas de inicio o fin programado no son válidas.");
     }
 
+    const requestedDiscount = Math.max(0, Number(parsed.data.order.discount_amount ?? 0));
+    if (requestedDiscount > 0 && !hasPermission(auth.profile.role, "orders.apply_discount")) {
+      return badRequest("No tienes permiso para aplicar descuentos.");
+    }
+
     const orderHeader = {
       ...parsed.data.order,
       scheduled_start,
@@ -53,14 +59,22 @@ export async function POST(request: NextRequest) {
       order_number: parsed.data.order.order_number ?? null,
       assigned_to: canPickOrderAssignee(auth.profile.role)
         ? parsed.data.order.assigned_to
-        : auth.profile.id
+        : auth.profile.id,
+      discount_amount: hasPermission(auth.profile.role, "orders.apply_discount") ? requestedDiscount : 0
     };
+
+    let resolvedServices;
+    try {
+      resolvedServices = await resolveServiceLinePricesFromCatalog(parsed.data.services);
+    } catch {
+      return badRequest("Uno o más servicios seleccionados no existen en el catálogo.");
+    }
 
     const result = await createWorkOrderBundle({
       idempotencyKey,
       actorId: auth.profile.id,
       order: orderHeader,
-      services: parsed.data.services,
+      services: resolvedServices,
       products: parsed.data.products
     });
 
@@ -75,11 +89,12 @@ export async function POST(request: NextRequest) {
       return badRequest(result.error);
     }
 
+    const showPricing = canViewServicePricing(auth.profile.role);
     return ok(
       {
         id: result.work_order_id,
         order_number: result.order_number,
-        total_amount: result.total_amount,
+        ...(showPricing ? { total_amount: result.total_amount } : {}),
         replayed: result.replayed
       },
       { status: result.replayed ? 200 : 201 }

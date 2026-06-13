@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { ecuadorWallDateTimeToUtcIso } from "@/lib/app-timezone";
 import { badRequest, forbidden, internalError, notFound, ok } from "@/lib/api-response";
 import { hasPermission, requirePermission } from "@/lib/permissions";
+import { canPickOrderAssignee } from "@/lib/roles";
 import { formatOrderStatus } from "@/lib/ui-labels";
 import type { UpdateWorkOrderInput } from "@/modules/orders/order.service";
 import {
@@ -123,10 +124,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const sessionProfile = auth.profile;
     const role = sessionProfile?.role;
 
-    if (clientRequestedOrderDetailPatch(rawBody) && !hasPermission(role, "orders.edit_details")) {
-      return forbidden(
-        "Solo un administrador puede editar programación, cliente, vehículo, notas y marcas de tiempo de la orden."
-      );
+    const detailPatchRequested = clientRequestedOrderDetailPatch(rawBody);
+    const assigneeOnlyPatch =
+      rawBody.assigned_to !== undefined &&
+      !ORDER_DETAIL_PATCH_KEYS.filter((key) => key !== "assigned_to").some((key) => rawBody[key] !== undefined);
+
+    if (detailPatchRequested) {
+      if (assigneeOnlyPatch && canPickOrderAssignee(role)) {
+        /* gerencia/admin pueden reasignar sin editar el resto de la cabecera */
+      } else if (!hasPermission(role, "orders.edit_details")) {
+        return forbidden(
+          "Solo un administrador puede editar programación, cliente, vehículo, notas y marcas de tiempo de la orden."
+        );
+      }
     }
 
     if (body.status !== undefined && body.status !== before.status) {
@@ -134,12 +144,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       if (denied) return denied;
     }
 
-    /** El descuento solo lo puede aplicar un administrador y solo en órdenes aún no facturadas/canceladas. */
+    /** El descuento lo aplican admin y gerencia; solo en órdenes aún no facturadas/canceladas. */
     let discountChanged = false;
     let nextDiscount: number | undefined;
     if (rawBody.discount_amount !== undefined) {
       if (!hasPermission(role, "orders.apply_discount")) {
-        return forbidden("Solo un administrador puede aplicar descuentos.");
+        return forbidden("No tienes permiso para aplicar descuentos.");
       }
       if (before.status === "invoiced" || before.status === "cancelled") {
         return badRequest("No se puede modificar el descuento de una orden facturada o cancelada.");

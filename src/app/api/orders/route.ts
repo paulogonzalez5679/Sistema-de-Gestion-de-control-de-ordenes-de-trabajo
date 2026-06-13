@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { ecuadorWallDateTimeToUtcIso } from "@/lib/app-timezone";
 import { badRequest, internalError, ok } from "@/lib/api-response";
-import { canPickOrderAssignee } from "@/lib/roles";
+import { canPickOrderAssignee, canViewAllWorkOrders } from "@/lib/roles";
 import { requirePermission } from "@/lib/permissions";
 import { orderHeaderSchema } from "@/lib/schemas/work-order";
 import { parseJsonBody } from "@/lib/schemas/zod-utils";
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     }
     const status = parseOrderStatusParam(statusRaw);
     const orders = await getAllOrders(search, status, {
-      assigneeUserId: auth.profile.role === "admin" ? undefined : auth.profile.id
+      assigneeUserId: canViewAllWorkOrders(auth.profile.role) ? undefined : auth.profile.id
     });
     return ok(orders);
   } catch (error) {

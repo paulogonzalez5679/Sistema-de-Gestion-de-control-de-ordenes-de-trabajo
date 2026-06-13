@@ -4,7 +4,7 @@ import { ModuleListSearch } from "@/components/module-list-search";
 import { OrdersListView } from "@/components/orders-list-view";
 import { DEFAULT_LIST_PAGE_SIZE, offsetForPage, parsePageParam } from "@/lib/pagination";
 import { firstSearchQuery } from "@/lib/search-params";
-import { canManageOrderBilling } from "@/lib/roles";
+import { canManageOrderBilling, canViewAllWorkOrders, canViewOrderHistory } from "@/lib/roles";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { getProfileByUserId } from "@/modules/profiles/profile.service";
 import { getOrdersEnrichedPage } from "@/modules/orders/order.service";
@@ -20,6 +20,7 @@ export default async function OrdersPage({ searchParams }: Props) {
   } = await supabase.auth.getUser();
   const profile = user ? await getProfileByUserId(user.id) : null;
   const showBilling = canManageOrderBilling(profile?.role);
+  const showHistory = canViewOrderHistory(profile?.role);
 
   const sp = await searchParams;
   const page = parsePageParam(sp.page);
@@ -37,7 +38,7 @@ export default async function OrdersPage({ searchParams }: Props) {
       limit: pageSize,
       offset,
       search: q || undefined,
-      ...(profile.role !== "admin" ? { assigneeUserId: profile.id } : {})
+      ...(canViewAllWorkOrders(profile.role) ? {} : { assigneeUserId: profile.id })
     });
     orders = result.rows;
     total = result.total;
@@ -57,9 +58,16 @@ export default async function OrdersPage({ searchParams }: Props) {
                 : `${total} orden${total === 1 ? "" : "es"} en el sistema.`}
           </p>
         </div>
-        <Link className="button orders-admin-cta" href="/dashboard/orders/new/identify">
-          Nueva orden
-        </Link>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          {showHistory ? (
+            <Link className="button secondary orders-admin-cta" href="/dashboard/orders/historial">
+              Historial
+            </Link>
+          ) : null}
+          <Link className="button orders-admin-cta" href="/dashboard/orders/new/identify">
+            Nueva orden
+          </Link>
+        </div>
       </header>
 
       <div className="orders-admin-toolbar">

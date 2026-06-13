@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ecuadorWallDateTimeToUtcIso } from "@/lib/app-timezone";
 import { badRequest, forbidden, internalError, ok } from "@/lib/api-response";
 import { requirePermission } from "@/lib/permissions";
+import { canViewAllWorkOrders } from "@/lib/roles";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
 import { createOrUpdateAppointment, listAppointments } from "@/modules/orders/order.service";
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
       return badRequest("Los parámetros start y end deben ser fechas ISO válidas.");
     }
     const appointments = await listAppointments(start, end, {
-      assigneeUserId: auth.profile.role === "admin" ? undefined : auth.profile.id
+      assigneeUserId: canViewAllWorkOrders(auth.profile.role) ? undefined : auth.profile.id
     });
     return ok(appointments);
   } catch (error) {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       return badRequest(msg);
     }
     const { work_order_id, starts_at, ends_at, bay } = parsed.data;
-    if (auth.profile.role !== "admin") {
+    if (!canViewAllWorkOrders(auth.profile.role)) {
       const supabase = createSupabaseAdminClient();
       const { data: wo } = await supabase
         .from("work_orders")

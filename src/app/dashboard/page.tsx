@@ -10,7 +10,7 @@ import { getAllOrders, getOrderServices, listAppointments } from "@/modules/orde
 import { getAllServices } from "@/modules/services/service.service";
 import { getAllVehicles } from "@/modules/vehicles/vehicle.service";
 import { countsTowardCompletionRate } from "@/lib/order-workflow";
-import { canManageInventory, isManagementRole } from "@/lib/roles";
+import { canManageInventory, canViewAllWorkOrders, isManagementRole } from "@/lib/roles";
 import type { Vehicle, WorkOrder, WorkOrderService } from "@/lib/types";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -41,7 +41,7 @@ export default async function DashboardPage() {
 
   const orders = await (async (): Promise<WorkOrder[]> => {
     if (!profile) return [];
-    if (profile.role === "admin") return getAllOrders();
+    if (canViewAllWorkOrders(profile.role)) return getAllOrders();
     return getAllOrders(undefined, undefined, { assigneeUserId: profile.id });
   })();
 
@@ -101,7 +101,7 @@ export default async function DashboardPage() {
   const appointments = await listAppointments(
     undefined,
     undefined,
-    profile.role === "admin" ? undefined : { assigneeUserId: profile.id }
+    canViewAllWorkOrders(profile.role) ? undefined : { assigneeUserId: profile.id }
   );
   const activeAppointmentsNow = appointments.filter((a) => {
     const s = new Date(a.starts_at);

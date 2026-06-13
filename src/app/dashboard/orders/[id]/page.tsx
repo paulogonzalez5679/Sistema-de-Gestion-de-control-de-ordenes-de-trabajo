@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { OrderAuditBeacon } from "@/components/order-audit-beacon";
 import { OrderOperationalUpdatesSection } from "@/components/order-operational-updates-section";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
+import { canViewServicePricing } from "@/lib/roles";
+import { getSessionProfile } from "@/lib/session-profile";
 import { getOrderById } from "@/modules/orders/order.service";
 import { formatDateTime, formatOrderStatus, formatServiceStatus } from "@/lib/ui-labels";
 
@@ -10,6 +12,8 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function WorkOrderOperationalViewPage({ params }: Params) {
   const { id } = await params;
+  const profile = await getSessionProfile();
+  const showServicePricing = canViewServicePricing(profile?.role);
   const order = await getOrderById(id);
   if (!order) notFound();
 
@@ -73,7 +77,9 @@ export default async function WorkOrderOperationalViewPage({ params }: Params) {
                 Servicio: {service.service_id} —{" "}
                 <span className={`status ${service.status}`}>{formatServiceStatus(service.status)}</span>
               </div>
-              <div style={{ color: "#b9accf" }}>${Number(service.price).toFixed(2)}</div>
+              {showServicePricing ? (
+                <div style={{ color: "#b9accf" }}>${Number(service.price).toFixed(2)}</div>
+              ) : null}
             </div>
           ))}
         </div>

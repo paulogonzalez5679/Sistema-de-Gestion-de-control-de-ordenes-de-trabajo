@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminOrderBillingActions } from "@/components/admin-order-billing-actions";
 import { OrderAuditBeacon } from "@/components/order-audit-beacon";
+import { OrderIntakeSection } from "@/components/order-intake-section";
 import { OrderStatusActions } from "@/components/order-status-actions";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
+import { canViewServicePricing } from "@/lib/roles";
 import { getSessionProfile } from "@/lib/session-profile";
 import { getOrderById, getOrderProductsEnriched } from "@/modules/orders/order.service";
 import {
@@ -46,6 +48,7 @@ export default async function AssignedJobDetailPage({ params }: Params) {
   if (!order) notFound();
 
   const sessionProfile = await getSessionProfile();
+  const showServicePricing = canViewServicePricing(sessionProfile?.role);
 
   const supabase = createSupabaseAdminClient();
 
@@ -189,13 +192,13 @@ export default async function AssignedJobDetailPage({ params }: Params) {
               <tr>
                 <th>Servicio</th>
                 <th>Estado línea</th>
-                <th style={{ textAlign: "right" }}>Precio</th>
+                {showServicePricing ? <th style={{ textAlign: "right" }}>Precio</th> : null}
               </tr>
             </thead>
             <tbody>
               {lines.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="order-detail-muted">
+                  <td colSpan={showServicePricing ? 3 : 2} className="order-detail-muted">
                     No hay líneas de servicio cargadas.
                   </td>
                 </tr>
@@ -210,9 +213,11 @@ export default async function AssignedJobDetailPage({ params }: Params) {
                     <td>
                       <span className={`status ${line.status}`}>{formatServiceStatus(line.status)}</span>
                     </td>
-                    <td style={{ textAlign: "right", fontWeight: 600 }}>
-                      ${Number(line.price).toFixed(2)}
-                    </td>
+                    {showServicePricing ? (
+                      <td style={{ textAlign: "right", fontWeight: 600 }}>
+                        ${Number(line.price).toFixed(2)}
+                      </td>
+                    ) : null}
                   </tr>
                 ))
               )}
@@ -277,6 +282,8 @@ export default async function AssignedJobDetailPage({ params }: Params) {
           <p className="order-detail-notes">{order.notes}</p>
         </section>
       ) : null}
+
+      <OrderIntakeSection orderId={id} />
 
       <section className="order-detail-card order-detail-card--stretch order-detail-actions-card">
         <h2 className="order-detail-card__title">Estado y administración</h2>

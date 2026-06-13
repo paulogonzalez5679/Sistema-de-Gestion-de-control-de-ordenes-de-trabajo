@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { internalError, ok } from "@/lib/api-response";
 import { sanitizePostgrestSearchToken } from "@/lib/postgrest-search";
 import { requirePermission } from "@/lib/permissions";
-import { canManageInventory } from "@/lib/roles";
+import { canManageInventory, canViewAllWorkOrders } from "@/lib/roles";
 import { listClientsPage } from "@/modules/clients/client.service";
 import { listInventoryPage } from "@/modules/inventory/inventory.service";
 import { getOrdersEnrichedPage } from "@/modules/orders/order.service";
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         limit: LIMIT,
         offset: 0,
         search: safe,
-        assigneeUserId: auth.profile.role === "admin" ? undefined : auth.profile.id
+        assigneeUserId: canViewAllWorkOrders(auth.profile.role) ? undefined : auth.profile.id
       }),
       listClientsPage({ limit: LIMIT, offset: 0, search: safe }),
       canInventory

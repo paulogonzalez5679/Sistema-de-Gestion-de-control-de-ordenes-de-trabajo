@@ -30,7 +30,32 @@ export function canEditWorkOrderDetails(role: ProfileRole | null | undefined): b
   return role === "admin";
 }
 
-/** Alta de orden: solo el administrador puede elegir otro responsable; el resto queda autoasignado. */
+/** Ve todas las órdenes y citas del taller (sin filtro por asignatario). */
+export function canViewAllWorkOrders(role: ProfileRole | null | undefined): boolean {
+  return isManagementRole(role);
+}
+
+/** Alta o reasignación: administración y gerencia eligen responsable; operador/detallista queda autoasignado. */
 export function canPickOrderAssignee(role: ProfileRole | null | undefined): boolean {
+  return isManagementRole(role);
+}
+
+/** Descuentos en creación de orden o revisión pre-factura: administración y gerencia. */
+export function canApplyOrderDiscount(role: ProfileRole | null | undefined): boolean {
+  return isManagementRole(role);
+}
+
+/** Precios del catálogo y montos cobrados por línea de servicio: solo administrador. */
+export function canViewServicePricing(role: ProfileRole | null | undefined): boolean {
+  return role === "admin";
+}
+
+/** Calendario de historial (por facturar / facturado): solo administrador. */
+export function canViewOrderHistory(role: ProfileRole | null | undefined): boolean {
+  return role === "admin";
+}
+
+/** Configuración del sistema (ruta de almacenamiento local, etc.): solo administrador. */
+export function canManageAppSettings(role: ProfileRole | null | undefined): boolean {
   return role === "admin";
 }

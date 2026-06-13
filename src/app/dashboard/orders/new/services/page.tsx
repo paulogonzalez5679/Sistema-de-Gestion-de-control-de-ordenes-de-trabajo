@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { OrderServicesForm } from "@/components/order-services-form";
 import { hasPermission } from "@/lib/permissions";
-import { canPickOrderAssignee } from "@/lib/roles";
+import { canApplyOrderDiscount, canPickOrderAssignee, canViewServicePricing } from "@/lib/roles";
 import { getSessionProfile } from "@/lib/session-profile";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -33,6 +33,8 @@ export default async function NewOrderServicesPage({ searchParams }: Props) {
         currentUserId={profile.id}
         currentUserName={profile.full_name.trim() || profile.email}
         canPickAssignee={canPickOrderAssignee(profile.role)}
+        canViewServicePricing={canViewServicePricing(profile.role)}
+        canApplyDiscount={canApplyOrderDiscount(profile.role)}
       />
     </div>
   );

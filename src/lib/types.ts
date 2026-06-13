@@ -89,6 +89,7 @@ export interface WorkOrder {
   total_amount: number;
   discount_amount: number;
   notes: string | null;
+  intake_condition_notes?: string | null;
   created_at: string;
   updated_at: string;
 }

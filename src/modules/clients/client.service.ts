@@ -47,6 +47,38 @@ export async function getAllClients(search?: string): Promise<Client[]> {
   return data as Client[];
 }
 
+/**
+ * Búsqueda para el flujo «Nueva orden → Identificación»:
+ * - 10 dígitos → cédula exacta (`cedula_norm`)
+ * - 13 dígitos → RUC exacto (`cedula_norm`)
+ * - Texto → nombre/apellido (coincidencia parcial)
+ */
+export async function searchClientsForOrderIdentification(query: string, limit = 20): Promise<Client[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const digits = normalizeCedulaDigits(trimmed);
+  if (digits && (digits.length === 10 || digits.length === 13)) {
+    const exact = await getClientByCedulaNorm(digits);
+    return exact ? [exact] : [];
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const safeSearch = sanitizePostgrestSearchToken(trimmed);
+  if (!safeSearch) return [];
+
+  const like = `%${safeSearch}%`;
+  const capped = Math.min(50, Math.max(1, limit));
+  const { data, error } = await supabase
+    .from("clients")
+    .select("*")
+    .or(`full_name.ilike.${like},cedula.ilike.${like}`)
+    .order("full_name", { ascending: true })
+    .limit(capped);
+  if (error) throw error;
+  return (data ?? []) as Client[];
+}
+
 export async function listClientsPage(options: {
   limit: number;
   offset: number;

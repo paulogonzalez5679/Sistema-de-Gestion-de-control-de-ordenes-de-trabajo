@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
+import { canViewServicePricing } from "@/lib/roles";
+import { getSessionProfile } from "@/lib/session-profile";
 import { formatDateTime, formatTimeOnly } from "@/lib/ui-labels";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function AppointmentDetailPage({ params }: Params) {
   const { id } = await params;
+  const profile = await getSessionProfile();
+  const showServicePricing = canViewServicePricing(profile?.role);
   const supabase = createSupabaseAdminClient();
   const { data: appointment } = await supabase.from("appointments").select("*").eq("id", id).single();
   if (!appointment) notFound();
@@ -43,7 +47,8 @@ export default async function AppointmentDetailPage({ params }: Params) {
           <h3 style={{ marginTop: 0 }}>Servicios solicitados</h3>
           {(orderServices ?? []).map((service) => (
             <div key={service.id} style={{ marginBottom: 8 }}>
-              Servicio n.º {service.service_id} • ${Number(service.price).toFixed(2)}
+              Servicio n.º {service.service_id}
+              {showServicePricing ? ` • $${Number(service.price).toFixed(2)}` : null}
             </div>
           ))}
           <h4>Total estimado: ${Number(order?.total_amount ?? 0).toFixed(2)}</h4>

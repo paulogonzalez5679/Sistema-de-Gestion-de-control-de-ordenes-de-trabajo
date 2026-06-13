@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { ServiceForm } from "@/components/service-form";
-import { canManageServiceCatalog } from "@/lib/roles";
+import { canManageServiceCatalog, canViewServicePricing } from "@/lib/roles";
 import { getSessionProfile } from "@/lib/session-profile";
 import { getServiceById } from "@/modules/services/service.service";
 
@@ -21,7 +21,7 @@ export default async function EditServicePage({ params }: Props) {
   return (
     <div className="row">
       <h1 style={{ margin: 0 }}>Editar servicio</h1>
-      <ServiceForm mode="edit" initial={service} />
+      <ServiceForm mode="edit" initial={service} canViewPricing={canViewServicePricing(profile?.role)} />
     </div>
   );
 }

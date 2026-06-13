@@ -4,6 +4,10 @@ import { isUuid } from "@/lib/ids";
 import { requirePermission } from "@/lib/permissions";
 import { setOrderServicesSchema } from "@/lib/schemas/order-line";
 import { parseJsonBody } from "@/lib/schemas/zod-utils";
+import {
+  redactWorkOrderServicePricing,
+  resolveServiceLinePricesFromCatalog
+} from "@/lib/service-pricing-access";
 import { getOrderServices, setOrderServices } from "@/modules/orders/order.service";
 
 type Params = { params: Promise<{ id: string }> };
@@ -16,7 +20,7 @@ export async function GET(_: NextRequest, { params }: Params) {
     const { id } = await params;
     if (!isUuid(id)) return badRequest("Identificador de orden inválido.");
     const services = await getOrderServices(id);
-    return ok(services);
+    return ok(services.map((line) => redactWorkOrderServicePricing(line, auth.profile.role)));
   } catch (error) {
     return internalError(error);
   }
@@ -33,8 +37,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const parsed = await parseJsonBody(request, setOrderServicesSchema);
     if ("response" in parsed) return parsed.response;
 
-    const updated = await setOrderServices(id, parsed.data.items);
-    return ok(updated);
+    let resolvedItems;
+    try {
+      resolvedItems = await resolveServiceLinePricesFromCatalog(parsed.data.items);
+    } catch {
+      return badRequest("Uno o más servicios seleccionados no existen en el catálogo.");
+    }
+
+    const updated = await setOrderServices(id, resolvedItems);
+    return ok(updated.map((line) => redactWorkOrderServicePricing(line, auth.profile.role)));
   } catch (error) {
     return internalError(error);
   }

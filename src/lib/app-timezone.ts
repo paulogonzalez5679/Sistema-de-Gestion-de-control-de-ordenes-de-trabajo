@@ -49,3 +49,16 @@ export function utcIsoToWallDatetimeLocal(iso: string, timeZone: string = APP_DI
   const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
   return `${pick("year")}-${pick("month")}-${pick("day")}T${pick("hour")}:${pick("minute")}`;
 }
+
+/** Clave YYYY-MM-DD en zona de negocio para agrupar eventos en calendario. */
+export function calendarDayKeyFromIso(iso: string, timeZone: string = APP_DISPLAY_TIME_ZONE): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-CA", { timeZone });
+}
+
+/** Clave YYYY-MM-DD a partir de una fecha de columna del calendario (día en zona de negocio). */
+export function calendarDayKeyFromLocalDate(date: Date, timeZone: string = APP_DISPLAY_TIME_ZONE): string {
+  const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0);
+  return calendarDayKeyFromIso(noon.toISOString(), timeZone);
+}

@@ -6,6 +6,7 @@ import type { InventoryItem, WorkOrderPriority } from "@/lib/types";
 import { formatPriority, formatProfileRole } from "@/lib/ui-labels";
 import { randomUuid } from "@/lib/ids";
 import { ResponsiveSelect } from "@/components/responsive-select";
+import { InlineSpinner } from "@/components/inline-spinner";
 import {
   INTAKE_MIN_PHOTOS,
   OrderIntakePhotosField
@@ -76,9 +77,22 @@ export function OrderServicesForm({
   const [intakeNotes, setIntakeNotes] = useState("");
   const [intakePhotos, setIntakePhotos] = useState<File[]>([]);
   const [discountAmount, setDiscountAmount] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitPhase, setSubmitPhase] = useState<"idle" | "creating" | "redirecting">("idle");
   const [initialDataLoading, setInitialDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const redirectFallbackRef = useRef<number | null>(null);
+
+  const isSubmitting = submitPhase !== "idle";
+
+  useEffect(() => {
+    return () => {
+      if (redirectFallbackRef.current !== null) {
+        window.clearTimeout(redirectFallbackRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!canPickAssignee) {
@@ -287,8 +301,12 @@ export function OrderServicesForm({
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    setLoading(true);
+    if (submittingRef.current || isSubmitting) return;
+
+    submittingRef.current = true;
+    setSubmitPhase("creating");
     setError(null);
+
     try {
       if (!clientId || !vehicleId) {
         throw new Error("Falta el contexto de cliente o vehículo.");
@@ -334,11 +352,16 @@ export function OrderServicesForm({
         throw new Error("No se pudo determinar el responsable de la orden.");
       }
 
-      // Reintento seguro: una sola escritura atómica protegida por Idempotency-Key.
-      const idempotencyKey = randomUuid();
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = randomUuid();
+      }
+
       const bundleRes = await fetch("/api/orders/bundle", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKeyRef.current
+        },
         body: JSON.stringify({
           order: {
             client_id: clientId,
@@ -351,7 +374,6 @@ export function OrderServicesForm({
             notes: notes.trim(),
             ...(canApplyDiscount && parsedDiscount > 0 ? { discount_amount: parsedDiscount } : {})
           },
-          // El servidor persiste el precio desde el catálogo; el cliente solo indica qué servicios van.
           services: selectedItems.map((service) => ({ service_id: service.id, price: 0 })),
           products: draftProducts.map((d) => ({ item_id: d.item_id, quantity: d.quantity, unit_price: d.unit_price }))
         })
@@ -396,13 +418,22 @@ export function OrderServicesForm({
         );
       }
 
-      router.push(`/dashboard/orders/assigned/${order.id}`);
+      const targetUrl = `/dashboard/orders/assigned/${order.id}`;
+      setSubmitPhase("redirecting");
+      router.push(targetUrl);
       router.refresh();
+
+      redirectFallbackRef.current = window.setTimeout(() => {
+        if (window.location.pathname.includes("/orders/new/services")) {
+          window.location.assign(targetUrl);
+        }
+      }, 2500);
     } catch (caught) {
+      submittingRef.current = false;
+      idempotencyKeyRef.current = null;
+      setSubmitPhase("idle");
       const message = caught instanceof Error ? caught.message : "No se pudo crear la orden.";
       setError(message);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -415,7 +446,19 @@ export function OrderServicesForm({
   }
 
   return (
-    <form className="row two" onSubmit={onSubmit}>
+    <>
+      {isSubmitting ? (
+        <div className="global-api-loading" role="status" aria-live="polite" aria-busy="true">
+          <div className="global-api-loading__backdrop" aria-hidden />
+          <div className="global-api-loading__panel">
+            <span className="global-api-loading__spinner" aria-hidden />
+            <span className="global-api-loading__label">
+              {submitPhase === "redirecting" ? "Orden creada. Abriendo…" : "Creando orden de trabajo…"}
+            </span>
+          </div>
+        </div>
+      ) : null}
+      <form className="row two" onSubmit={onSubmit} aria-busy={isSubmitting}>
       <div className="row" style={{ display: "grid", gap: 16 }}>
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Paquetes de servicio</h3>
@@ -735,7 +778,7 @@ export function OrderServicesForm({
           onNotesChange={setIntakeNotes}
           photos={intakePhotos}
           onPhotosChange={setIntakePhotos}
-          disabled={loading}
+          disabled={isSubmitting}
         />
         <div className="card order-summary-card" style={{ marginTop: 12 }}>
           <h4 style={{ marginTop: 0 }}>Resumen de la orden</h4>
@@ -770,10 +813,18 @@ export function OrderServicesForm({
           ) : null}
         </div>
         {error ? <p style={{ color: "#ff8f9c" }}>{error}</p> : null}
-        <button className="button" style={{ marginTop: 12 }} type="submit" disabled={loading}>
-          {loading ? "Creando…" : "Crear orden de trabajo"}
+        <button className="button" style={{ marginTop: 12 }} type="submit" disabled={isSubmitting}>
+          <span className="btn-loading-inner">
+            {isSubmitting ? <InlineSpinner size="sm" /> : null}
+            {isSubmitting
+              ? submitPhase === "redirecting"
+                ? "Abriendo orden…"
+                : "Creando…"
+              : "Crear orden de trabajo"}
+          </span>
         </button>
       </div>
     </form>
+    </>
   );
 }

@@ -49,6 +49,44 @@ function run(command, args, options = {}) {
   }
 }
 
+function removeDirectory(path) {
+  if (!existsSync(path)) return;
+
+  try {
+    rmSync(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    return;
+  } catch (error) {
+    console.warn(`\nAdvertencia: rmSync falló al eliminar ${path}. Intentando alternativa de Windows...`);
+  }
+
+  if (process.platform === "win32") {
+    try {
+      spawnSync("cmd.exe", ["/c", `attrib -R -S -H /S /D "${path}\\*"`], {
+        cwd: root,
+        shell: true,
+        stdio: "inherit"
+      });
+      spawnSync("cmd.exe", ["/c", `rd /s /q "${path}"`], {
+        cwd: root,
+        shell: true,
+        stdio: "inherit"
+      });
+      if (!existsSync(path)) return;
+    } catch {
+      /* ignore fallback errors, we'll show the original one */
+    }
+  }
+
+  try {
+    rmSync(path, { recursive: true, force: true });
+  } catch (error) {
+    console.error(`\nError: no se pudo eliminar la carpeta anterior: ${path}`);
+    console.error("Asegúrese de que ningún programa o proceso tenga abiertos archivos dentro de ella.");
+    console.error("Cierre Explorador de archivos, editores y terminales que puedan estar en esa carpeta, luego vuelva a intentar.");
+    throw error;
+  }
+}
+
 function ensureExists(path, label) {
   if (!existsSync(path)) {
     console.error(`\nError: no se encontró ${label}: ${path}`);
@@ -86,7 +124,7 @@ ensureExists(staticDir, "assets estáticos (.next/static)");
 
 if (existsSync(outDir)) {
   console.log(`\n2/3  Limpiando carpeta anterior: ${outDir}\n`);
-  rmSync(outDir, { recursive: true, force: true });
+  removeDirectory(outDir);
 }
 
 console.log("\n2/3  Copiando artefactos al paquete...\n");

@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 cd /d "%~dp0"
 title AutoDetail SaaS Pro
@@ -16,7 +16,7 @@ if exist "BUILD-INFO.txt" (
     type BUILD-INFO.txt
     echo.
     echo  Solucion: genere el paquete en un PC Windows con "npm run package:win"
-    echo  o descargue el ZIP generado por GitHub Actions ^(build Windows^).
+    echo  o descargue el ZIP generado por GitHub Actions (build Windows).
     echo.
     pause
     exit /b 1
@@ -54,8 +54,8 @@ node launch-server.mjs
 set EXIT_CODE=%ERRORLEVEL%
 
 echo.
-if "%EXIT_CODE%" NEQ "0" (
-  echo  El servidor termino con error (codigo %EXIT_CODE%^^).
+if %EXIT_CODE% NEQ 0 (
+  echo  El servidor termino con error (codigo %EXIT_CODE%^).
   echo  Ejecute Verificar-Instalacion.bat para mas ayuda.
 ) else (
   echo  Servidor detenido.

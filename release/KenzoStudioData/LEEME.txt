@@ -1,0 +1,11 @@
+Kenzo Studio — datos locales del taller
+
+Las fotos de ingreso de órdenes y la configuración de almacenamiento se guardan aquí.
+No elimine esta carpeta al actualizar la aplicación.
+
+Estructura:
+  config/settings.json  — ruta personalizada de fotos (opcional)
+  media/orders/         — fotos por orden
+
+La aplicación usa esta carpeta cuando se ejecuta desde la carpeta del paquete Windows
+(ruta predeterminada: ../KenzoStudioData respecto al servidor).

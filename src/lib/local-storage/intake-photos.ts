@@ -1,7 +1,7 @@
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { detectImageExt, isAllowedImageMime, ORDER_IMAGE_MAX_BYTES } from "@/lib/image-bytes";
+import { detectImageExt, isAllowedImageMime } from "@/lib/image-bytes";
 import { isUuid } from "@/lib/ids";
 import {
   orderIntakeDir,
@@ -12,7 +12,6 @@ import { getEffectiveMediaRoot } from "@/lib/local-storage/settings";
 
 export const INTAKE_MIN_PHOTOS = 1;
 export const INTAKE_MAX_PHOTOS = 5;
-export const INTAKE_MAX_BYTES = ORDER_IMAGE_MAX_BYTES;
 
 export type IntakePhotoMeta = {
   filename: string;
@@ -67,9 +66,6 @@ export async function saveOrderIntake(params: {
   let index = 1;
 
   for (const file of params.files) {
-    if (file.buffer.length > INTAKE_MAX_BYTES) {
-      throw new Error("Cada foto debe pesar menos de 3 MB.");
-    }
     const detected = detectImageExt(file.buffer);
     if (!detected) {
       throw new Error("Solo se permiten imágenes JPEG, PNG o WebP.");

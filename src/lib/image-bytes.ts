@@ -1,5 +1,3 @@
-export const ORDER_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
-
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/webp": ".webp",
@@ -47,9 +45,6 @@ export function parseBase64ImagePayload(base64Data: string): Buffer | null {
 }
 
 export function validateOrderImageBuffer(buffer: Buffer): { mimeType: string } | { error: string } {
-  if (buffer.length > ORDER_IMAGE_MAX_BYTES) {
-    return { error: "La imagen debe pesar menos de 3 MB." };
-  }
   const detected = detectImageExt(buffer);
   if (!detected) {
     return { error: "Solo se permiten imágenes JPEG, PNG o WebP." };
